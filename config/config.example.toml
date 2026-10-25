@@ -1,0 +1,47 @@
+# intellect 配置示例 —— 复制为 config/config.toml 后按需修改（config.toml 不入库）。
+# 未出现在此文件中的项一律使用内置默认值（与 DESIGN.md V0.3 一致）。
+# API Key 不写在本文件：LLM 用环境变量 INTELLECT_LLM_API_KEY，
+# Embedding 用 INTELLECT_EMBEDDING_API_KEY 注入。
+
+# ---- 知识级去重阈值（DESIGN §5.2）----
+[dedup]
+auto_merge_threshold = 0.80   # s ≥ 此值且最高分唯一 → 自动合并来源；多知识命中一律转人工
+gray_zone_threshold = 0.60    # 此值 ≤ s < 0.80 → 灰区转人工；s < 此值 → 自动创建新知识
+
+# ---- 原文切分参数（DESIGN §3.2，写入 source_document.parse_config）----
+[chunk]
+chunk_size = 800              # 切片目标长度（字符）
+chunk_overlap = 100           # 相邻切片重叠（字符），必须小于 chunk_size
+# separators = ["\n\n", "\n", "。", "；", "，", " ", ""]   # 分隔符，按优先级降序
+
+# ---- FTS5 关键词检索（DESIGN §7.3）----
+[fts]
+short_question_max_terms = 4  # 分词去停用词后 ≤ 此词数直接进 OR 检索式，超过则先抽关键概念
+top_k = 20                    # bm25(rank) 排序取 top-K
+
+# ---- 向量检索（DESIGN §7.4）----
+[vector]
+top_k = 20
+score_threshold = 0.0         # 召回分数下限，0 为不过滤
+
+# ---- LLM（DESIGN 2.1；T2.4 接入前 model/base_url 必须配置）----
+[llm]
+provider = "openai"           # OpenAI 协议兼容的推理服务
+model = ""
+base_url = ""
+temperature = 0.1
+
+# ---- Embedding（模型注册与启用以数据库 embedding_model 表为准，DESIGN §3.4）----
+[embedding]
+model_name = "bge-m3"
+dimension = 1024              # 需与 embedding_model 表登记维度一致
+base_url = ""
+
+# ---- 数据库（驱动为标准库 sqlite3；PRAGMA 为硬约束，不可配置）----
+[database]
+path = "data/intellect.db"
+
+# ---- 日志（格式统一在 core/logging.py 定义）----
+[logging]
+level = "INFO"                # DEBUG / INFO / WARNING / ERROR / CRITICAL
+dir = "logs"

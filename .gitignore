@@ -218,3 +218,20 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ---- intellect 项目约定（GIT_COMMIT.md 第五节）----
+# SQLite 数据库与 WAL/SHM：可重建派生数据，禁止提交
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+data/
+# 向量索引产物：可重建派生数据，禁止提交
+chroma/
+vector_index/
+# 本地配置文件（可能含 API Key）：仅提交 config/config.example.toml
+config/config.toml
+# 运行日志
+logs/

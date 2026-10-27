@@ -13,11 +13,17 @@ from intellect.core.config import (
     ChunkConfig,
     DedupConfig,
     Settings,
+    TokenizationConfig,
     load_settings,
 )
 
 
 class TestDefaults:
+    def test_tokenization_uses_builtin_assets_by_default(self):
+        assert Settings().tokenization == TokenizationConfig()
+        assert Settings().tokenization.user_dictionaries == []
+        assert Settings().tokenization.stopwords_path is None
+
     """默认值必须与 DESIGN.md 一致。"""
 
     def test_dedup_thresholds_match_design(self):
@@ -30,6 +36,16 @@ class TestDefaults:
 
 
 class TestValidation:
+    @pytest.mark.parametrize("values", [
+        {"user_dictionaries": "dictionary.txt"},
+        {"user_dictionaries": [""]},
+        {"stopwords_path": ""},
+        {"unexpected": True},
+    ])
+    def test_tokenization_asset_configuration_rejected_when_invalid(self, values):
+        with pytest.raises(ValidationError):
+            TokenizationConfig(**values)
+
     def test_gray_threshold_must_be_below_auto(self):
         with pytest.raises(ValidationError):
             DedupConfig(auto_merge_threshold=0.80, gray_zone_threshold=0.80)
@@ -48,6 +64,14 @@ class TestValidation:
 
 
 class TestLoad:
+    def test_tokenization_configuration_from_toml(self, tmp_path):
+        path = tmp_path / "config.toml"
+        path.write_text('[tokenization]\nuser_dictionaries = ["config/domain.txt"]\n'
+                        'stopwords_path = "config/stopwords.txt"\n', encoding="utf-8")
+        assert load_settings(path).tokenization == TokenizationConfig(
+            user_dictionaries=["config/domain.txt"], stopwords_path="config/stopwords.txt"
+        )
+
     @pytest.mark.parametrize("section", ["llm", "embedding"])
     @pytest.mark.parametrize("env_enabled", [False, True])
     def test_api_key_in_file_rejected(self, tmp_path, monkeypatch, section, env_enabled):

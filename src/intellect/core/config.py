@@ -17,6 +17,7 @@ import os
 import tomllib
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -67,6 +68,13 @@ class ChunkConfig(StrictModel):
         if self.chunk_overlap >= self.chunk_size:
             raise ValueError("chunk_overlap 必须小于 chunk_size")
         return self
+
+
+class TokenizationConfig(StrictModel):
+    """DESIGN §7.3：同一组词典与停用词供写入/查询共用，资产变化后整体重建 FTS。"""
+
+    user_dictionaries: list[Annotated[str, Field(min_length=1)]] = Field(default_factory=list)
+    stopwords_path: str | None = Field(default=None, min_length=1)
 
 
 class FtsConfig(StrictModel):
@@ -126,6 +134,7 @@ class Settings(StrictModel):
 
     dedup: DedupConfig = DedupConfig()
     chunk: ChunkConfig = ChunkConfig()
+    tokenization: TokenizationConfig = TokenizationConfig()
     fts: FtsConfig = FtsConfig()
     vector: VectorConfig = VectorConfig()
     llm: LlmConfig = LlmConfig()

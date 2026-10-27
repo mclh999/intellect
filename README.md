@@ -83,6 +83,32 @@ with closing(connect_database()) as connection:
 知识别名变更也同事务维护 FTS，不创建知识新版本或向量任务。
 服务独立调用时自行提交；若调用方已开启事务，服务使用保存点并由调用方最终提交/回滚。
 
+## 分词资产与 FTS 重建
+
+写入和查询共用 `intellect.search.tokenization`。默认使用锁定的 jieba 内置词典和随包发布的空停用词表。
+可在 `[tokenization]` 配置 `user_dictionaries`（按顺序加载的 UTF-8 jieba 词典路径）及
+`stopwords_path`（UTF-8，一行一个精确词元）；相对路径以工作目录为基准。
+自定义词典支持省略频次或填写正整数频次；零频词不受支持，以避免修改 jieba 的全局 HMM 状态。
+
+`get_tokenizer().manifest` 提供 jieba 版本、内置/自定义词典与停用词文件的 SHA-256，
+`manifest.asset_id` 标识整组资产。词典、停用词及清单须随同一发布版本保存。
+在用实例持有文件内容快照，修改磁盘文件不会改变该实例；停用词仅过滤查询词元，不改写正式正文。
+
+升级 jieba、词典或停用词时，先暂停业务读写，再使用新资产在维护进程中执行：
+
+```python
+from contextlib import closing
+from intellect.db import connect_database
+from intellect.index.fts import rebuild_fts
+
+with closing(connect_database()) as connection:
+    count = rebuild_fts(connection)
+```
+
+重建成功后再用相同配置与资产重启服务。失败时原 FTS 整体回滚，保持停服或恢复旧资产后重启。
+重建只读取正式知识当前版本、别名和分类，不改写事实记录或创建向量任务。
+当前采用显式维护流程；未接入自动启动核验，也未实现知识/切片业务哈希协议。
+
 ## 运行测试
 
 ```bash

@@ -5,10 +5,12 @@ from __future__ import annotations
 import sqlite3
 
 from intellect.knowledge._common import KnowledgeManagementError
-from intellect.search.tokenization import token_text
+from intellect.search.tokenization import TextTokenizer, get_tokenizer
 
 
-def refresh_knowledge(connection: sqlite3.Connection, knowledge_id: int) -> None:
+def refresh_knowledge(
+    connection: sqlite3.Connection, knowledge_id: int, *, tokenizer: TextTokenizer | None = None,
+) -> None:
     """调用方持有写事务；一知识一行，从当前版本与正式元数据重新生成。"""
     if not connection.in_transaction:
         raise KnowledgeManagementError("FTS 维护必须加入正式变更事务")
@@ -24,6 +26,7 @@ def refresh_knowledge(connection: sqlite3.Connection, knowledge_id: int) -> None
     connection.execute("DELETE FROM knowledge_fts WHERE rowid = ?", (knowledge_id,))
     if row is None or row[0] != 0:
         return
+    tokenizer = tokenizer if tokenizer is not None else get_tokenizer()
     aliases = [value[0] for value in connection.execute(
         "SELECT name FROM alias WHERE owner_type = 0 AND owner_id = ? ORDER BY id", (knowledge_id,)
     )]
@@ -39,8 +42,8 @@ def refresh_knowledge(connection: sqlite3.Connection, knowledge_id: int) -> None
     connection.execute(
         "INSERT INTO knowledge_fts (rowid, title_tokens, content_tokens, alias_tokens, "
         "category_tokens, knowledge_id, version_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (knowledge_id, token_text([row[3] or ""]), token_text([row[4]]),
-         token_text(aliases), token_text(category_texts), knowledge_id, row[1]),
+        (knowledge_id, tokenizer.token_text([row[3] or ""]), tokenizer.token_text([row[4]]),
+         tokenizer.token_text(aliases), tokenizer.token_text(category_texts), knowledge_id, row[1]),
     )
 
 

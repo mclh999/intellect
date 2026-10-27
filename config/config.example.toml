@@ -15,6 +15,13 @@ chunk_size = 800              # 切片目标长度（字符）
 chunk_overlap = 100           # 相邻切片重叠（字符），必须小于 chunk_size
 # separators = ["\n\n", "\n", "。", "；", "，", " ", ""]   # 分隔符，按优先级降序
 
+# ---- 共用分词资产（DESIGN §7.3，T2.3）----
+[tokenization]
+user_dictionaries = []       # UTF-8 jieba 自定义词典路径，按顺序加载；频次须为正整数或省略
+# stopwords_path = "config/stopwords.txt"  # UTF-8，一行一个精确词元；默认使用随包发布的空表
+# 相对路径以工作目录为基准；资产按内容 SHA-256 版本化。
+# 词典/停用词/jieba 变化后，暂停读写并整体重建 FTS，再恢复服务；不自动更改事实哈希。
+
 # ---- FTS5 关键词检索（DESIGN §7.3）----
 [fts]
 short_question_max_terms = 4  # 分词去停用词后 ≤ 此词数直接进 OR 检索式，超过则先抽关键概念

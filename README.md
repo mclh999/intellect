@@ -109,6 +109,25 @@ with closing(connect_database()) as connection:
 重建只读取正式知识当前版本、别名和分类，不改写事实记录或创建向量任务。
 当前采用显式维护流程；未接入自动启动核验，也未实现知识/切片业务哈希协议。
 
+## FTS 关键词检索
+
+```python
+from contextlib import closing
+from intellect.db import connect_database
+from intellect.search.fts import FtsSearchService
+
+with closing(connect_database()) as connection:
+    hits = FtsSearchService(connection).search("原子性 可见性")
+```
+
+去停用词后不超过 `fts.short_question_max_terms` 的问题，逐词转义并以显式 OR 检索，
+按 bm25（`rank`）取 `fts.top_k`。返回知识/版本 ID、当时标题/正文及原始 rank，过滤停用知识和过期 FTS 版本。
+
+长问题须向服务传入 `concept_extractor(question)`，返回 2–4 个非空文本概念；服务逐概念取 top-K，
+按召回顺序去重合并，不跨概念相加或重排 rank。缺少抽取器、数量非法或调用失败均抛出 `FtsSearchError`。
+当前只提供抽取器接口，真实模型、意图理解和完整问答流程仍由 T4 接入。
+多个概念的数据库查询共用读快照，不提交调用方已有事务；空问题或全停用词问题返回空列表。
+
 ## 运行测试
 
 ```bash

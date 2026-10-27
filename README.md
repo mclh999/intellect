@@ -38,6 +38,23 @@ python -m venv .venv
 复制 [`config/config.example.toml`](config/config.example.toml) 为 `config/config.toml` 后按需修改；
 API Key 一律经环境变量注入，不写入配置文件。
 配置文件路径可用环境变量 `INTELLECT_CONFIG` 指定。
+文件中出现 `llm.api_key` / `embedding.api_key` 将报错；配置对象的文本表示与导出均隐藏密钥。
+
+## 数据库初始化
+
+首次创建空数据库（路径来自 `database.path`，默认 `data/intellect.db`）：
+
+```bash
+uv run python -c "from intellect.db import initialize_database; initialize_database()"
+```
+
+初始化会创建 V0.4 的 15 张业务表与 `knowledge_fts`，启用 WAL，并原子提交建表。
+目标库已有结构时会报错，已有事实库迁移须先评审；初始化失败不会删除数据库文件。
+运行时 SQL 随 Python 包发布，无需依赖本地 `document/` 目录。
+
+业务代码通过 `intellect.db.connect_database()` 连接已有库；每连接注册
+`INTELLECT_ALIAS_V1` 并设置外键、5 秒锁等待与 `synchronous=NORMAL`。
+调用方负责事务与关闭连接。此阶段尚未登记启用模型或建立分类树，主入口仍为骨架入口。
 
 ## 运行测试
 

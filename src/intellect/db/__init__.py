@@ -1,1 +1,12 @@
-"""数据库基础设施：连接工厂、PRAGMA 初始化、建表脚本执行（T1 落地）。"""
+"""SQLite 连接与新库初始化。"""
+
+from intellect.db.connection import ALIAS_COLLATION, alias_comparison_key, connect_database
+from intellect.db.initialize import DatabaseInitializationError, initialize_database
+
+__all__ = [
+    "ALIAS_COLLATION",
+    "DatabaseInitializationError",
+    "alias_comparison_key",
+    "connect_database",
+    "initialize_database",
+]

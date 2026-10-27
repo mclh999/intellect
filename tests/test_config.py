@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import tomllib
+
 import pytest
 from pydantic import ValidationError
 
@@ -46,6 +48,38 @@ class TestValidation:
 
 
 class TestLoad:
+    @pytest.mark.parametrize("section", ["llm", "embedding"])
+    @pytest.mark.parametrize("env_enabled", [False, True])
+    def test_api_key_in_file_rejected(self, tmp_path, monkeypatch, section, env_enabled):
+        for variable in (ENV_LLM_API_KEY, ENV_EMBEDDING_API_KEY):
+            monkeypatch.delenv(variable, raising=False)
+            if env_enabled:
+                monkeypatch.setenv(variable, "test-env-key")
+        config_file = tmp_path / "config.toml"
+        config_file.write_text(f'[{section}]\napi_key = "test-file-key"\n', encoding="utf-8")
+        with pytest.raises(ValueError, match="api_key") as caught:
+            load_settings(config_file)
+        assert "test-file-key" not in str(caught.value)
+
+    def test_api_keys_hidden_in_repr_and_dump(self, tmp_path, monkeypatch):
+        monkeypatch.setenv(ENV_LLM_API_KEY, "test-llm-secret")
+        monkeypatch.setenv(ENV_EMBEDDING_API_KEY, "test-embedding-secret")
+        settings = load_settings(tmp_path / "absent.toml")
+        assert "test-llm-secret" not in repr(settings)
+        assert "test-embedding-secret" not in str(settings)
+        assert "api_key" not in settings.model_dump()["llm"]
+        assert "api_key" not in settings.model_dump()["embedding"]
+
+    def test_config_directory_is_not_missing_file(self, tmp_path):
+        with pytest.raises(OSError):
+            load_settings(tmp_path)
+
+    def test_malformed_toml_rejected(self, tmp_path):
+        config_file = tmp_path / "config.toml"
+        config_file.write_text("[dedup", encoding="utf-8")
+        with pytest.raises(tomllib.TOMLDecodeError):
+            load_settings(config_file)
+
     def test_load_without_file_uses_defaults(self, tmp_path, monkeypatch):
         monkeypatch.delenv("INTELLECT_CONFIG", raising=False)
         settings = load_settings(tmp_path / "absent.toml")

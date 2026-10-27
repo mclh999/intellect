@@ -1,11 +1,12 @@
 # intellect 配置示例 —— 复制为 config/config.toml 后按需修改（config.toml 不入库）。
-# 未出现在此文件中的项一律使用内置默认值（与 DESIGN.md V0.3 一致）。
+# 未出现在此文件中的项使用内置默认值；V0.4 规定去重阈值和短问题词数阈值，
+# 其他值为工程默认值，不代表新增业务规则。
 # API Key 不写在本文件：LLM 用环境变量 INTELLECT_LLM_API_KEY，
 # Embedding 用 INTELLECT_EMBEDDING_API_KEY 注入。
 
 # ---- 知识级去重阈值（DESIGN §5.2）----
 [dedup]
-auto_merge_threshold = 0.80   # s ≥ 此值且最高分唯一 → 自动合并来源；多知识命中一律转人工
+auto_merge_threshold = 0.80   # 还须最高分唯一、逐项一致性核对通过并满足验收门槛；多命中转人工
 gray_zone_threshold = 0.60    # 此值 ≤ s < 0.80 → 灰区转人工；s < 此值 → 自动创建新知识
 
 # ---- 原文切分参数（DESIGN §3.2，写入 source_document.parse_config）----

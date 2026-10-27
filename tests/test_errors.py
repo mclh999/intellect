@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from intellect.core.errors import (
     IntellectError,
@@ -26,6 +27,13 @@ class TestIntellectError:
 
 
 class TestBuildErrorInfo:
+    def test_non_json_context_keeps_error_recordable(self):
+        info = json.loads(build_error_info(IntellectError(
+            "文件读取失败", context={"path": Path("source/document.txt")}
+        )))
+        assert info["message"] == "文件读取失败"
+        assert info["context"]["path"] == str(Path("source/document.txt"))
+
     def test_payload_fields(self):
         try:
             raise TaskExecutionError("嵌入超时", task_id=42, task_type=1)

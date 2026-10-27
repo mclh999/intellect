@@ -84,4 +84,5 @@ def build_error_info(exc: BaseException, *, task_id: int | None = None) -> str:
         "occurred_at": dt.datetime.now().astimezone().isoformat(timespec="seconds"),
         "traceback": "\n".join(lines),
     }
-    return json.dumps(payload, ensure_ascii=False)
+    # 路径、日期等上下文对象保留文本表示，避免错误记录因序列化再次失败。
+    return json.dumps(payload, ensure_ascii=False, default=str)

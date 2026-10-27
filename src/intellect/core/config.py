@@ -1,7 +1,8 @@
 """配置中心（T0.3）：全部可调参数集中于此，禁止散落硬编码。
 
 读取顺序（后者覆盖前者）：
-1. 内置默认值 —— 与 DESIGN.md V0.3 保持一致（去重阈值 0.80/0.60、短问题词数阈值 4 等）；
+1. 内置默认值 —— DESIGN.md V0.4 规定去重阈值 0.80/0.60、短问题词数阈值 4；
+   其他值为工程默认值，不代表新增业务规则；
 2. TOML 配置文件 —— 默认 ``config/config.toml``（不入库），路径可用环境变量
    ``INTELLECT_CONFIG`` 指定；只提交注释完备的 ``config/config.example.toml``；
 3. 环境变量 —— API Key 等敏感信息只经环境变量注入，禁止写入配置文件：
@@ -39,7 +40,7 @@ class DedupConfig(StrictModel):
     s 为候选与已有有效知识当前版本正文的向量余弦相似度。
     """
 
-    # s ≥ auto_merge_threshold 且最高分唯一 → 自动合并来源；多知识命中一律转人工
+    # s ≥ 阈值且最高分唯一、逐项一致性核对通过并满足验收门槛，才可自动合并来源
     auto_merge_threshold: float = Field(default=0.80, gt=0, lt=1)
     # gray_zone_threshold ≤ s < auto_merge_threshold → 灰区转人工；s < 该值 → 自动创建新知识
     gray_zone_threshold: float = Field(default=0.60, gt=0, lt=1)
@@ -89,7 +90,7 @@ class LlmConfig(StrictModel):
     provider: str = Field(default="openai", description="OpenAI 协议兼容的推理服务")
     model: str = Field(default="", description="模型名，接入前必须配置")
     base_url: str = Field(default="", description="API 地址，接入前必须配置")
-    api_key: str | None = Field(default=None, exclude=True, description="仅经环境变量注入")
+    api_key: str | None = Field(default=None, exclude=True, repr=False, description="仅经环境变量注入")
     temperature: float = Field(default=0.1, ge=0, le=2)
 
 
@@ -104,7 +105,7 @@ class EmbeddingConfig(StrictModel):
     model_name: str = Field(default="bge-m3")
     dimension: int = Field(default=1024, gt=0)
     base_url: str = Field(default="", description="API 地址，使用本地模型时可留空")
-    api_key: str | None = Field(default=None, exclude=True, description="仅经环境变量注入")
+    api_key: str | None = Field(default=None, exclude=True, repr=False, description="仅经环境变量注入")
 
 
 class DatabaseConfig(StrictModel):
@@ -141,9 +142,16 @@ def load_settings(config_path: str | Path | None = None) -> Settings:
     """
     path = Path(config_path or os.environ.get(ENV_CONFIG_PATH, DEFAULT_CONFIG_PATH))
     overrides: dict = {}
-    if path.is_file():
+    try:
         with path.open("rb") as fh:
             overrides = tomllib.load(fh)
+    except FileNotFoundError:
+        pass
+
+    for section in ("llm", "embedding"):
+        values = overrides.get(section)
+        if isinstance(values, dict) and "api_key" in values:
+            raise ValueError(f"{section}.api_key 禁止写入配置文件，请通过环境变量注入")
 
     settings = Settings(**overrides)
 

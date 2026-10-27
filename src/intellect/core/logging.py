@@ -19,7 +19,7 @@ import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from intellect.core.config import Settings
+from intellect.core.config import Settings, get_settings
 
 LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -42,21 +42,15 @@ def setup_logging(settings: Settings | None = None, *, force: bool = False) -> N
     if _configured and not force:
         return
 
-    level = logging.INFO
-    log_dir = Path("logs")
-    if settings is not None:
-        level = logging.getLevelName(settings.logging.level)
-        log_dir = Path(settings.logging.dir)
+    if settings is None:
+        settings = get_settings()
+    level = logging.getLevelName(settings.logging.level)
+    log_dir = Path(settings.logging.dir)
 
     formatter = logging.Formatter(LOG_FORMAT, datefmt=DATE_FORMAT)
 
-    root = logging.getLogger()
-    root.setLevel(level)
-    root.handlers.clear()
-
     console = logging.StreamHandler(sys.stderr)
     console.setFormatter(formatter)
-    root.addHandler(console)
 
     log_dir.mkdir(parents=True, exist_ok=True)
     file_handler = RotatingFileHandler(
@@ -66,6 +60,13 @@ def setup_logging(settings: Settings | None = None, *, force: bool = False) -> N
         encoding="utf-8",
     )
     file_handler.setFormatter(formatter)
+
+    root = logging.getLogger()
+    root.setLevel(level)
+    for handler in root.handlers[:]:
+        root.removeHandler(handler)
+        handler.close()
+    root.addHandler(console)
     root.addHandler(file_handler)
 
     for name in _NOISY_LOGGERS:

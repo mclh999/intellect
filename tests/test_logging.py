@@ -25,6 +25,16 @@ def test_setup_idempotent(tmp_path):
     assert len(logging.getLogger().handlers) == count == 2  # 控制台 + 文件
 
 
+def test_reconfigure_closes_previous_file(tmp_path):
+    settings = Settings()
+    settings.logging.dir = str(tmp_path / "logs")
+    setup_logging(settings, force=True)
+    previous = next(h for h in logging.getLogger().handlers if isinstance(h, logging.FileHandler))
+    previous_stream = previous.stream
+    setup_logging(settings, force=True)
+    assert previous_stream.closed
+
+
 def test_format_matches_baseline():
     record = logging.LogRecord(
         name="intellect.review.worker",

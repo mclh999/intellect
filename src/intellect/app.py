@@ -20,11 +20,12 @@ def main() -> int:
     setup_logging(settings)
 
     print(f"intellect {intellect.__version__} —— Agent 知识库系统")
-    print("配置中心就绪（默认值与设计稿一致）：")
+    print("配置中心就绪：")
     print(
-        f"  去重阈值：自动合并 s>={settings.dedup.auto_merge_threshold:.2f}，"
+        f"  去重阈值：自动合并候选 s>={settings.dedup.auto_merge_threshold:.2f}，"
         f"灰区 s>={settings.dedup.gray_zone_threshold:.2f}"
     )
+    print("  自动合并还须满足唯一命中、一致性核对及验收门槛")
     print(f"  FTS 短问题词数阈值：{settings.fts.short_question_max_terms}")
     print(f"  切分参数：size={settings.chunk.chunk_size} overlap={settings.chunk.chunk_overlap}")
 

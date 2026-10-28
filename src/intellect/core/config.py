@@ -13,13 +13,14 @@
 
 from __future__ import annotations
 
+import codecs
 import os
 import tomllib
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # 环境变量名约定
 ENV_CONFIG_PATH = "INTELLECT_CONFIG"
@@ -68,6 +69,23 @@ class ChunkConfig(StrictModel):
         if self.chunk_overlap >= self.chunk_size:
             raise ValueError("chunk_overlap 必须小于 chunk_size")
         return self
+
+
+class DocumentConfig(StrictModel):
+    """解析工程参数；创建任务时冻结编码，网络仅用于显式 WEB 归档。"""
+
+    text_encoding: str = Field(default="utf-8", min_length=1)
+    web_timeout_seconds: float = Field(default=30.0, gt=0, allow_inf_nan=False)
+
+    @field_validator("text_encoding")
+    @classmethod
+    def _text_encoding(cls, value: str) -> str:
+        try:
+            codecs.lookup(value)
+            "a".encode(value)
+        except (LookupError, ValueError) as exc:
+            raise ValueError("text_encoding 必须是受支持的文本编码") from exc
+        return value
 
 
 class TokenizationConfig(StrictModel):
@@ -134,6 +152,7 @@ class Settings(StrictModel):
 
     dedup: DedupConfig = DedupConfig()
     chunk: ChunkConfig = ChunkConfig()
+    document: DocumentConfig = DocumentConfig()
     tokenization: TokenizationConfig = TokenizationConfig()
     fts: FtsConfig = FtsConfig()
     vector: VectorConfig = VectorConfig()

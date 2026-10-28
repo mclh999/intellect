@@ -3,8 +3,8 @@
 以 SQLite 为唯一事实数据源、FTS5 + jieba 与向量检索混合召回的个人知识库，
 覆盖 **文档导入 → 知识抽取 → 混合检索 → 问答引用 → 审核 / 纠错 → 版本回滚** 完整闭环。
 
-- 权威设计稿：[document/DESIGN.md](document/DESIGN.md)（V0.7）
-- 表结构准绳：[document/Agent知识库-建表脚本V0.7.sql](document/Agent知识库-建表脚本V0.7.sql)
+- 权威设计稿：[document/DESIGN.md](document/DESIGN.md)（V0.8）
+- 表结构准绳：[document/Agent知识库-建表脚本V0.8.sql](document/Agent知识库-建表脚本V0.8.sql)
 - 协作规范：[document/AGENT.md](document/AGENT.md) · 任务清单：[document/TASK.md](document/TASK.md)
 
 ## 环境要求
@@ -48,8 +48,9 @@ API Key 一律经环境变量注入，不写入配置文件。
 uv run python -c "from intellect.db import initialize_database; initialize_database()"
 ```
 
-初始化会创建 V0.7 的 15 张业务表与 `knowledge_fts`，启用 WAL，并原子提交建表。
-V0.7 增加任务批次快照、切片完成数量与唯一索引，首次发布前文档有效批次为空。
+初始化会创建 V0.8 的 15 张业务表与 `knowledge_fts`，启用 WAL，并原子提交建表。
+V0.8 与 V0.7 DDL 一致，仅明确了切片词元统计口径。
+V0.7 新增任务批次号、解析配置快照和切片完成数量，文档首次发布前有效批次为空。已有 V0.4–V0.6 数据库不会自动迁移；批次服务遇到旧结构会明确报错，不可通过重建事实库升级。
 目标库已有结构时会报错，已有事实库迁移须先评审；初始化失败不会删除数据库文件。
 运行时 SQL 随 Python 包发布，无需依赖本地 `document/` 目录。
 
@@ -136,7 +137,8 @@ uv run pytest
 
 ## 目录结构
 
-与设计稿 2.2 七大模块一一对应，详见 [document/AGENT.md](document/AGENT.md) 第二节。
+与设计稿 2.2 七大模块一一对应，详见 [document/AGENT.md](document/AGENT.md) 第一节。
+
 
 ## 导入批次基础（T2.8）
 
@@ -147,4 +149,37 @@ uv run pytest
 - `save_chunks(task_id, [ChunkInput(...)])` 原子保存一组切片；已存在切片须原文、哈希、token_count 和位置元数据一致，才复用原切片 ID。上次已提交内容不受本次失败影响。
 - 只有解析成功读完输入后，才调用 `publish(task_id, expected_count=N)`。服务验证完整序号与哈希，再原子切换有效批次及配置；成功空结果用 N=0。不能用已写入行数推断解析完成。
 
-独立调用使用短写事务；外层已开启事务时使用保存点，提交/回滚由调用方决定。发布不改变整个导入任务状态，旧批次及配置继续保留。切片哈希采用随包 `hash_protocols.json` 固定的 chunk-v1 协议，保留所有原文字符；文件/正文/知识哈希、实际解析器、候选抽取和 worker 仍待对应任务接入。
+独立调用使用短写事务；外层已开启事务时使用保存点，提交/回滚由调用方决定。发布不改变整个导入任务状态，旧批次及配置继续保留。切片哈希采用随包 `hash_protocols.json` 固定的 chunk-v1 协议，保留所有原文字符；文件/正文哈希及实际解析器已接入，知识哈希、候选抽取和 worker 仍待对应任务。
+
+## 文档解析与切片（T2.1 / T2.2）
+
+`inspect_bytes(data, source_type)`（位于 `intellect.doc.parsers`）提取完整正文并返回
+`file-v1` 原文件哈希、`document-v1` 正文哈希及文件大小，供上游登记/文件去重使用。
+处理服务使用已登记的文档 ID，不新增文档或跳过 T3.2 的文件去重规则：
+
+```python
+from contextlib import closing
+from intellect.db import connect_database
+from intellect.doc.processing import DocumentProcessingService
+
+with closing(connect_database()) as connection:
+    service = DocumentProcessingService(connection)
+    batch = service.create(document_id)  # document_id 来自文档登记
+    published = service.run(batch.task_id)
+    # 中断后仍调用 run(batch.task_id)，不要再次 create 分配新任务
+```
+
+支持 TXT 严格按显式编码解码、PDF 文本层、DOCX 主文档段落/表格（含嵌套表格），以及本地归档 HTML。
+PDF 加密文件及无文本层的图像页明确报错，当前不提供 OCR；HTML 不执行 JavaScript，排除 script/style/template 内容。
+WEB 可先调用 `intellect.doc.web.archive_web(url, destination)` 归档实际响应字节，返回路径、原始哈希和响应编码；
+以返回编码创建 WEB 任务（`parser_options={"encoding": archive.encoding}`）。已有归档禁止覆盖，重试不再次访问远端。
+
+`[document]` 统一配置默认 `text_encoding` 和归档请求的 `web_timeout_seconds`。
+任务快照冻结本地归档 URI/字节哈希、解析器及后端版本、编码、切分器和词元统计器版本；
+文件字节改变或版本不一致时拒绝继续旧批次。解析配置在切片前持久化，运行不改写文档登记时的文件/正文哈希。
+
+切片按配置的字符长度、重叠与分隔符优先级切分，保留原文字符，不跨 PDF 页或 DOCX 段落/单元格重叠；
+位置包含解析正文中的字符范围（Unicode 码点）、行号及可用页/段落/表格路径。
+`token_count` 固定使用随包 jieba 0.42.1 词典、HMM=False 的非纯空白词元数，不是 LLM 计费 token，亦不受 FTS 配置影响。
+只有解析和切分完整结束后才发布最终切片数；中途失败保留已提交切片与旧有效批次，完整空结果发布为 0。
+固定词典保留其 [MIT 许可声明](src/intellect/doc/assets/JIEBA_LICENSE.txt)，原始字节由 Git 属性保护，不做换行转换。

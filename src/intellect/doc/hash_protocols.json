@@ -1,4 +1,16 @@
 {
+  "file-v1": {
+    "algorithm": "sha256",
+    "input": "original-bytes",
+    "prefix": "file-v1:sha256:"
+  },
+  "document-v1": {
+    "algorithm": "sha256",
+    "encoding": "utf-8",
+    "errors": "strict",
+    "normalization": "crlf-cr-to-lf",
+    "prefix": "document-v1:sha256:"
+  },
   "chunk-v1": {
     "algorithm": "sha256",
     "encoding": "utf-8",

@@ -15,6 +15,9 @@ dependencies = [
     "chromadb>=0.5",
     # 配置中心加载与校验
     "pydantic>=2.7",
+    # PDF / DOCX 文本解析（T2.1，已获用户确认）
+    "pypdf>=6,<7",
+    "python-docx>=1.2,<2",
     # SQLite 驱动使用 Python 标准库 sqlite3，无需额外依赖
 ]
 

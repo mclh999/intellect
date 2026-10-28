@@ -12,6 +12,7 @@ from intellect.core.config import (
     ENV_LLM_API_KEY,
     ChunkConfig,
     DedupConfig,
+    DocumentConfig,
     Settings,
     TokenizationConfig,
     load_settings,
@@ -19,6 +20,10 @@ from intellect.core.config import (
 
 
 class TestDefaults:
+    def test_document_engineering_defaults(self):
+        assert Settings().document.text_encoding == "utf-8"
+        assert Settings().document.web_timeout_seconds == 30.0
+
     def test_tokenization_uses_builtin_assets_by_default(self):
         assert Settings().tokenization == TokenizationConfig()
         assert Settings().tokenization.user_dictionaries == []
@@ -36,6 +41,13 @@ class TestDefaults:
 
 
 class TestValidation:
+    @pytest.mark.parametrize("values", [{"text_encoding":""}, {"text_encoding":"no-such-codec"},
+        {"text_encoding":"base64_codec"}, {"web_timeout_seconds":0}, {"web_timeout_seconds":float('inf')},
+        {"web_timeout_seconds":float('nan')}, {"unknown":1}])
+    def test_invalid_document_configuration_rejected(self, values):
+        with pytest.raises(ValidationError):
+            DocumentConfig(**values)
+
     @pytest.mark.parametrize("values", [
         {"user_dictionaries": "dictionary.txt"},
         {"user_dictionaries": [""]},
@@ -64,6 +76,11 @@ class TestValidation:
 
 
 class TestLoad:
+    def test_document_configuration_from_toml(self, tmp_path):
+        path = tmp_path / "document.toml"
+        path.write_text('[document]\ntext_encoding="gb18030"\nweb_timeout_seconds=9.0\n',encoding="utf-8")
+        assert load_settings(path).document == DocumentConfig(text_encoding='gb18030',web_timeout_seconds=9)
+
     def test_tokenization_configuration_from_toml(self, tmp_path):
         path = tmp_path / "config.toml"
         path.write_text('[tokenization]\nuser_dictionaries = ["config/domain.txt"]\n'

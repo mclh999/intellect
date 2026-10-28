@@ -1,0 +1,8 @@
+{
+  "protocol": "jieba-nonspace-v1",
+  "jieba_version": "0.42.1",
+  "dictionary_sha256": "7197c3211ddd98962b036cdf40324d1ea2bfaa12bd028e68faa70111a88e12a8",
+  "cut_all": false,
+  "HMM": false,
+  "exclude": "isspace"
+}

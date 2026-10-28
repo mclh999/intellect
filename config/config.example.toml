@@ -15,6 +15,11 @@ chunk_size = 800              # 切片目标长度（字符）
 chunk_overlap = 100           # 相邻切片重叠（字符），必须小于 chunk_size
 # separators = ["\n\n", "\n", "。", "；", "，", " ", ""]   # 分隔符，按优先级降序
 
+# ---- 文档解析（T2.1；实际编码和切分参数保存在任务快照）----
+[document]
+text_encoding = "utf-8"       # TXT/已归档 HTML 的默认编码，严格解码，不自动猜测或替换坏字节
+web_timeout_seconds = 30.0   # 仅显式 WEB 归档请求使用；重试解析从本地归档读取
+
 # ---- 共用分词资产（DESIGN §7.3，T2.3）----
 [tokenization]
 user_dictionaries = []       # UTF-8 jieba 自定义词典路径，按顺序加载；频次须为正整数或省略

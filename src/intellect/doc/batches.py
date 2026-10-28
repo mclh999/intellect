@@ -11,6 +11,7 @@ from uuid import uuid4
 
 from intellect.core.config import ChunkConfig, get_settings
 from intellect.core.errors import IntellectError
+from intellect.core.tasks import TaskLease
 from intellect.doc.hashing import chunk_hash
 
 
@@ -76,8 +77,9 @@ class DocumentBatchService:
     已提交片段在后续调用失败时保留；当前调用中的写入全部回滚。
     """
 
-    def __init__(self, connection: sqlite3.Connection):
+    def __init__(self, connection: sqlite3.Connection, *, lease: TaskLease | None = None):
         self.connection = connection
+        self.lease = lease
         columns = {row[1] for row in connection.execute("PRAGMA table_info(task_process)")}
         if not {"chunk_batch", "parse_config", "chunk_count"} <= columns:
             raise DocumentBatchError("批次服务需要 V0.7 结构；已有事实库须先评审迁移")
@@ -104,6 +106,8 @@ class DocumentBatchService:
         self, source_document_id: int, *, parser: str, parser_version: str,
         chunking: ChunkConfig | None = None, parser_options: dict | None = None,
     ) -> ImportBatch:
+        if self.lease is not None:
+            raise DocumentBatchError("worker 必须恢复已绑定任务，不能分配新批次")
         _integer(source_document_id, "source_document_id", 1)
         if any(not isinstance(value, str) or not value.strip() for value in (parser, parser_version)):
             raise DocumentBatchError("必须明确解析器及版本")
@@ -141,6 +145,8 @@ class DocumentBatchService:
     def save_chunks(self, task_id: int, chunks: Iterable[ChunkInput]) -> list[int]:
         ids = []
         with _atomic(self.connection):
+            if self.lease is not None:
+                self.lease.check(self.connection, task_id, 0)
             batch = self.get(task_id)
             self._document(batch.source_document_id)
             if batch.chunk_count is not None:
@@ -171,12 +177,16 @@ class DocumentBatchService:
                         (batch.source_document_id, batch.chunk_batch, chunk.chunk_index,
                          chunk.content, digest, chunk.token_count, location),
                     ).lastrowid)
+            if self.lease is not None:
+                self.lease.touch(self.connection, task_id, 0)
         return ids
 
     def publish(self, task_id: int, *, expected_count: int) -> ImportBatch:
         """expected_count 必须来自成功结束的解析过程，不能用已存行数猜测。"""
         _integer(expected_count, "expected_count")
         with _atomic(self.connection):
+            if self.lease is not None:
+                self.lease.touch(self.connection, task_id, 0)
             batch = self.get(task_id)
             current, _ = self._document(batch.source_document_id)
             if batch.chunk_count is not None and batch.chunk_count != expected_count:

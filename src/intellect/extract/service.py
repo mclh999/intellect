@@ -7,6 +7,7 @@ import logging
 import sqlite3
 from dataclasses import dataclass
 
+from intellect.core.tasks import TaskLease
 from intellect.doc.batches import DocumentBatchService, _atomic
 from intellect.doc.hashing import chunk_hash
 from intellect.extract.model import ExtractionError, LangChainExtractor, canonical_json, validate_output
@@ -48,8 +49,9 @@ class ExtractionResult:
 
 
 class ExtractionService:
-    def __init__(self, connection: sqlite3.Connection, extractor: LangChainExtractor):
+    def __init__(self, connection: sqlite3.Connection, extractor: LangChainExtractor, *, lease: TaskLease | None = None):
         self.connection = connection
+        self.lease = lease
         if not isinstance(extractor, LangChainExtractor):
             raise ExtractionError("抽取服务需要版本化 LangChain 适配器")
         self.extractor = extractor
@@ -58,9 +60,11 @@ class ExtractionService:
         for table, fields in required.items():
             if not fields <= {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}:
                 raise ExtractionError("抽取服务需要 V0.9 结构；已有事实库须先评审迁移")
-        self.batches = DocumentBatchService(connection)
+        self.batches = DocumentBatchService(connection, lease=lease)
 
     def _task(self, task_id: int):
+        if self.lease is not None:
+            self.lease.touch(self.connection, task_id, 0)
         batch = self.batches.get(task_id)
         row = self.connection.execute(
             "SELECT d.status,t.extract_config FROM task_process t JOIN source_document d "

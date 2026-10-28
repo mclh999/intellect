@@ -3,7 +3,7 @@
 以 SQLite 为唯一事实数据源、FTS5 + jieba 与向量检索混合召回的个人知识库，
 覆盖 **文档导入 → 知识抽取 → 混合检索 → 问答引用 → 审核 / 纠错 → 版本回滚** 完整闭环。
 
-- 权威设计稿：[document/DESIGN.md](document/DESIGN.md)（V0.9）
+- 权威设计稿：[document/DESIGN.md](document/DESIGN.md)（V0.10）
 - 表结构准绳：[document/Agent知识库-建表脚本V0.9.sql](document/Agent知识库-建表脚本V0.9.sql)
 - 协作规范：[AGENTS.md](AGENTS.md) · 任务清单：[document/TASK.md](document/TASK.md)
 
@@ -250,7 +250,7 @@ results = ExtractionService(connection, extractor).run(published.task_id)
 `save_result(source, output)`；配置准备和结果提交均支持保存点，最终提交/回滚由调用方决定。
 候选保持待审核；本服务不改变任务状态，不创建正式知识、审核决策或索引同步任务。
 
-## 任务查询与字段校验（T3.1 已交付部分）
+## 任务查询与执行（T3.1）
 
 `intellect.core.tasks.TaskQueryService(connection).get(task_id)` 返回不可变任务记录；
 `list_pending(task_type)` 查询指定类型的待处理任务，任务和关联字段核验使用同一读快照。
@@ -258,4 +258,29 @@ results = ExtractionService(connection, extractor).run(published.task_id)
 同步任务不允许使用待审核状态，历史目标版本的过期消费策略由后续同步服务处理。
 
 查询不会领取任务、写心跳、修改状态或提交调用方已有事务。
-执行所有权、显式重试与 worker 方案仍待确认，T3.1 整体尚未完成。
+任务状态服务、失败错误落库、显式重试及有限次 worker 轮询已接入；不更改 V0.9 表结构。
+
+```python
+from intellect.core.worker import ImportTaskHandler, TaskWorker
+from intellect.core.tasks import TaskStateService
+
+# extractor 为前述版本化 LangChain 适配器；每个执行线程使用自己的数据库连接
+worker = TaskWorker(connection, {0: ImportTaskHandler(extractor)})
+result = worker.run_once(0)                       # 没有可领取任务时返回 None
+results = worker.run_pending(0, limit=10)         # 本次最多执行 10 个待处理任务
+# 用户决定重试某个失败任务后，显式调用：
+# TaskStateService(connection).retry(failed_task_id)
+```
+
+领取原子地将待处理变为处理中，用任务 ID、类型和领取时的 `retry_count` 核验执行所有权。
+失败同事务保存统一错误、置已失败并递增计数；计数永不重置，显式重试保留批次、配置及已提交结果。
+最近错误保留到后续执行，便于查明失败原因。心跳、切片、候选和最终状态提交均在写事务内核验所有权，
+已失效执行者不能覆盖新执行。worker 不在模型调用期间持有写事务，也不接受调用方的外层事务。
+
+导入处理器完成解析/抽取后，`match_and_review(context)` 可接入后续匹配审核服务；
+自定义处理器的业务写入须使用 `context.transaction()`，可显式调用 `context.heartbeat()`。
+尚有未判定候选时明确失败，保留结果供重试；全部待处理候选均已有待审核事项时才进入待审核，
+完整空结果或候选均已处理/拒绝且无未解决事项时才能完成。当前未实现真实匹配审核算法或正式知识写入。
+
+worker 只消费已注册处理器的待处理任务，不自动重试失败任务、扫描超时或回收旧执行者。
+向量同步消费者、长期运行调度、定时心跳及失活恢复仍由后续任务接入，主入口仍为骨架。

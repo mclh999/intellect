@@ -50,6 +50,21 @@ def canonical_json(value) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
 
+def extraction_manifest(identity: dict) -> dict:
+    if (not isinstance(identity, dict) or set(identity) != {"provider", "name", "version"}
+            or any(not isinstance(value, str) or not value.strip() for value in identity.values())):
+        raise ExtractionError("必须明确提供模型服务商、名称及版本")
+    try:
+        canonical_json(identity).encode("utf-8", errors="strict")
+    except UnicodeError as exc:
+        raise ExtractionError("模型标识必须能够编码为 UTF-8") from exc
+    return {
+        "model": dict(identity), "prompt_version": PROMPT_VERSION, "schema_version": SCHEMA_VERSION,
+        "prompt_sha256": hashlib.sha256(canonical_json([SYSTEM_PROMPT, SOURCE_PROMPT]).encode("utf-8")).hexdigest(),
+        "schema_sha256": hashlib.sha256(canonical_json(ExtractionOutput.model_json_schema()).encode("utf-8")).hexdigest(),
+    }
+
+
 def validate_output(value) -> ExtractionOutput:
     try:
         # 重新验证实例，避免外部修改 items 列表绕过完整结果校验。
@@ -86,17 +101,7 @@ class LangChainExtractor:
         if not isinstance(model, Runnable):
             raise ExtractionError("模型必须是 LangChain Runnable")
         identity = {"provider": provider, "name": model_name, "version": model_version}
-        if any(not isinstance(value, str) or not value.strip() for value in identity.values()):
-            raise ExtractionError("必须明确提供模型服务商、名称及版本")
-        try:
-            canonical_json(identity).encode("utf-8", errors="strict")
-        except UnicodeError as exc:
-            raise ExtractionError("模型标识必须能够编码为 UTF-8") from exc
-        self._manifest = {
-            "model": identity, "prompt_version": PROMPT_VERSION, "schema_version": SCHEMA_VERSION,
-            "prompt_sha256": hashlib.sha256(canonical_json([SYSTEM_PROMPT, SOURCE_PROMPT]).encode("utf-8")).hexdigest(),
-            "schema_sha256": hashlib.sha256(canonical_json(ExtractionOutput.model_json_schema()).encode("utf-8")).hexdigest(),
-        }
+        self._manifest = extraction_manifest(identity)
         prompt = ChatPromptTemplate.from_messages([("system", SYSTEM_PROMPT), ("human", SOURCE_PROMPT)])
         self._chain = prompt | model | _CompleteJsonParser()
 

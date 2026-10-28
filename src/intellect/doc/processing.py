@@ -12,6 +12,7 @@ from pydantic import ValidationError
 
 from intellect.core.config import ChunkConfig
 from intellect.core.errors import IntellectError
+from intellect.core.tasks import TaskLease
 from intellect.doc.batches import DocumentBatchService, ImportBatch, _atomic
 from intellect.doc.counting import get_counter
 from intellect.doc.hashing import file_hash
@@ -42,9 +43,9 @@ def _read_archive(path: Path) -> bytes:
 
 
 class DocumentProcessingService:
-    def __init__(self, connection: sqlite3.Connection):
+    def __init__(self, connection: sqlite3.Connection, *, lease: TaskLease | None = None):
         self.connection = connection
-        self.batches = DocumentBatchService(connection)
+        self.batches = DocumentBatchService(connection, lease=lease)
 
     def create(
         self, document_id: int, *, chunking: ChunkConfig | None = None, parser_options: dict | None = None,

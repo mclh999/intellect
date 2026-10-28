@@ -11,7 +11,7 @@ dependencies = [
     "langchain>=0.3",
     # 中文分词：FTS5 写入与查询统一预分词（DESIGN 7.3）
     "jieba>=0.42",
-    # 本地向量索引客户端（DESIGN 2.1"独立向量库/本地向量索引"；选型见 PROBLEM_AND_ADVICE 待评审）
+    # 本地向量索引客户端（DESIGN 2.1"独立向量库/本地向量索引"；选型见 PROBLEM.MD 待评审）
     "chromadb>=0.5",
     # 配置中心加载与校验
     "pydantic>=2.7",

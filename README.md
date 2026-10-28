@@ -5,7 +5,7 @@
 
 - 权威设计稿：[document/DESIGN.md](document/DESIGN.md)（V0.8）
 - 表结构准绳：[document/Agent知识库-建表脚本V0.8.sql](document/Agent知识库-建表脚本V0.8.sql)
-- 协作规范：[document/AGENT.md](document/AGENT.md) · 任务清单：[document/TASK.md](document/TASK.md)
+- 协作规范：[AGENTS.md](AGENTS.md) · 任务清单：[document/TASK.md](document/TASK.md)
 
 ## 环境要求
 
@@ -137,7 +137,7 @@ uv run pytest
 
 ## 目录结构
 
-与设计稿 2.2 七大模块一一对应，详见 [document/AGENT.md](document/AGENT.md) 第一节。
+与设计稿 2.2 七大模块一一对应，详见 [AGENTS.md](AGENTS.md) 第一节。
 
 
 ## 导入批次基础（T2.8）

@@ -194,3 +194,28 @@ WEB 可先调用 `intellect.doc.web.archive_web(url, destination)` 归档实际�
 `get_knowledge_hasher().manifest` 提供协议与资产指纹副本；使用前检查分词版本、词典和清单，
 不匹配时明确报错。file/document/chunk/knowledge-v1 四种协议清单均随包发布。
 本接口不回填或覆盖历史哈希；首次升级业务哈希规则或专用资产前，仍须评审兼容方案。
+
+## 文档登记与文件去重（T3.2）
+
+新来源使用登记服务，先检查启用文档的正文哈希，再比较命中文档的原文件哈希：
+
+```python
+from contextlib import closing
+from intellect.db import connect_database
+from intellect.doc.importing import DocumentImportService
+
+with closing(connect_database()) as connection:
+    service = DocumentImportService(connection)
+    registered = service.register("data/archive/source.txt", title="资料", kind="TXT")
+    published = service.processing.run(registered.batch.task_id)
+```
+
+正文相同默认抛出 `DuplicateDocumentError`，`context["documents"]` 提供已有文档 ID、标题、
+归档位置和原文件是否相同；拒绝时不新增文档或任务。用户明确选择保留独立来源后，
+以 `confirmed_duplicate=True` 再次登记，保留各自文档、任务与证据切片。
+WEB 先归档，再传入本地路径、`kind="WEB"` 及响应编码对应的 `parser_options`。
+
+文档与初始批次同事务登记，并发去重在写事务内复核；批次准备失败整体回滚。
+独立调用自行提交，外层事务由调用方提交或回滚。重试处理使用原任务 ID；重新解析同一文档时，
+使用 `DocumentProcessingService.create(existing_document_id)`，不重新登记来源。
+当前提供 Python 服务接口，入口尚未接入导入 UI、worker、拒绝审计或候选抽取。

@@ -249,3 +249,13 @@ results = ExtractionService(connection, extractor).run(published.task_id)
 在事务外用 `extractor.invoke(source.content)` 获取输出，再于外层事务内
 `save_result(source, output)`；配置准备和结果提交均支持保存点，最终提交/回滚由调用方决定。
 候选保持待审核；本服务不改变任务状态，不创建正式知识、审核决策或索引同步任务。
+
+## 任务查询与字段校验（T3.1 已交付部分）
+
+`intellect.core.tasks.TaskQueryService(connection).get(task_id)` 返回不可变任务记录；
+`list_pending(task_type)` 查询指定类型的待处理任务，任务和关联字段核验使用同一读快照。
+接口验证导入/同步任务的条件必填字段、互斥字段、状态和版本归属；
+同步任务不允许使用待审核状态，历史目标版本的过期消费策略由后续同步服务处理。
+
+查询不会领取任务、写心跳、修改状态或提交调用方已有事务。
+执行所有权、显式重试与 worker 方案仍待确认，T3.1 整体尚未完成。

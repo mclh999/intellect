@@ -1,4 +1,4 @@
-"""新库初始化：V0.5 DDL 原子执行，不承担既有事实库迁移（T1.1）。"""
+"""新库初始化：V0.7 DDL 原子执行，不承担既有事实库迁移（T1.1）。"""
 
 from __future__ import annotations
 
@@ -63,4 +63,4 @@ def initialize_database(path: str | Path | None = None) -> None:
         ) from exc
     finally:
         connection.close()
-    logger.info("数据库 V0.5 初始化完成：%s", target)
+    logger.info("数据库 V0.7 初始化完成：%s", target)

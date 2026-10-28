@@ -3,8 +3,8 @@
 以 SQLite 为唯一事实数据源、FTS5 + jieba 与向量检索混合召回的个人知识库，
 覆盖 **文档导入 → 知识抽取 → 混合检索 → 问答引用 → 审核 / 纠错 → 版本回滚** 完整闭环。
 
-- 权威设计稿：[document/DESIGN.md](document/DESIGN.md)（V0.5）
-- 表结构准绳：[document/Agent知识库-建表脚本V0.5.sql](document/Agent知识库-建表脚本V0.5.sql)
+- 权威设计稿：[document/DESIGN.md](document/DESIGN.md)（V0.7）
+- 表结构准绳：[document/Agent知识库-建表脚本V0.7.sql](document/Agent知识库-建表脚本V0.7.sql)
 - 协作规范：[document/AGENT.md](document/AGENT.md) · 任务清单：[document/TASK.md](document/TASK.md)
 
 ## 环境要求
@@ -48,8 +48,8 @@ API Key 一律经环境变量注入，不写入配置文件。
 uv run python -c "from intellect.db import initialize_database; initialize_database()"
 ```
 
-初始化会创建 V0.5 的 15 张业务表与 `knowledge_fts`，启用 WAL，并原子提交建表。
-V0.5 与 V0.4 表结构一致，本次只补齐分类管理业务规则。
+初始化会创建 V0.7 的 15 张业务表与 `knowledge_fts`，启用 WAL，并原子提交建表。
+V0.7 增加任务批次快照、切片完成数量与唯一索引，首次发布前文档有效批次为空。
 目标库已有结构时会报错，已有事实库迁移须先评审；初始化失败不会删除数据库文件。
 运行时 SQL 随 Python 包发布，无需依赖本地 `document/` 目录。
 
@@ -137,3 +137,14 @@ uv run pytest
 ## 目录结构
 
 与设计稿 2.2 七大模块一一对应，详见 [document/AGENT.md](document/AGENT.md) 第二节。
+
+## 导入批次基础（T2.8）
+
+`intellect.doc.batches.DocumentBatchService` 使用已有连接和已登记的文档 ID：
+
+- `create(document_id, parser=..., parser_version=..., chunking=...)` 分配文档内递增批次并保存解析配置。`chunking` 省略时从配置中心读取；同文档已有未发布批次时返回错误及原任务 ID，应恢复原任务。
+- `get(task_id).parse_config` 是不可变 JSON 快照。调用方必须使用快照对应的解析器版本、参数和原始归档文件；失败重试复用原任务，不重新 create。
+- `save_chunks(task_id, [ChunkInput(...)])` 原子保存一组切片；已存在切片须原文、哈希、token_count 和位置元数据一致，才复用原切片 ID。上次已提交内容不受本次失败影响。
+- 只有解析成功读完输入后，才调用 `publish(task_id, expected_count=N)`。服务验证完整序号与哈希，再原子切换有效批次及配置；成功空结果用 N=0。不能用已写入行数推断解析完成。
+
+独立调用使用短写事务；外层已开启事务时使用保存点，提交/回滚由调用方决定。发布不改变整个导入任务状态，旧批次及配置继续保留。切片哈希采用随包 `hash_protocols.json` 固定的 chunk-v1 协议，保留所有原文字符；文件/正文/知识哈希、实际解析器、候选抽取和 worker 仍待对应任务接入。

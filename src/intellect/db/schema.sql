@@ -1,8 +1,12 @@
--- 运行时 DDL：来源 document/Agent知识库-建表脚本V0.5.sql（DESIGN V0.5）
--- 表、字段、外键和索引保持权威脚本定义；PRAGMA 由连接工厂与初始化入口执行。
+-- 运行时 DDL：来源 document/Agent知识库-建表脚本V0.7.sql（DESIGN V0.7）
+-- PRAGMA 由连接工厂与初始化入口执行；不自动迁移已有事实库。
+-- V0.7：任务固定批次/配置，chunk_count 完整发布标记；仅新库初始化，旧事实库迁移另行评审。
+-- V0.6：初始哈希协议见 DESIGN §5.2；与 V0.5 DDL 一致，不需要结构迁移。
+-- 哈希 TEXT 值保存 <用途>-v1:sha256:<64位小写摘要>，用途为 file/document/chunk/knowledge。
+-- 知识哈希使用固定分词资产，与 FTS 配置隔离；首次写入前交付协议清单与快照。
 -- V0.5：分类/别名规则见 DESIGN §3.8；与 V0.4 DDL 完全一致，不需要结构迁移。
 -- ============================================================================
--- Agent 知识库系统 建表脚本 V0.5
+-- Agent 知识库系统 建表脚本 V0.7
 -- V0.5：别名按统一比较规则保证同对象唯一；不新增停用字段。
 -- 执行前：每个连接注册 INTELLECT_ALIAS_V1，精确定义见 DESIGN §3.10。
 -- 本脚本用于新库初始化，不是 V0.3 事实库迁移脚本；禁止用重建事实库代替迁移。
@@ -53,8 +57,8 @@ CREATE TABLE IF NOT EXISTS source_document (
   file_hash        TEXT,                     -- 原始文件哈希
   content_hash     TEXT    NOT NULL,         -- 规范化正文哈希（不设 UNIQUE：不同文档允许同文，见去重规则）
   file_size        INTEGER,
-  parse_config     TEXT,                     -- JSON：解析器类型与切分参数（块大小/重叠/分隔符），保证切片可复现
-  chunk_batch      INTEGER NOT NULL DEFAULT 1, -- 当前有效切片批次；重解析 +1，旧批次切片保留供既有引用
+  parse_config     TEXT,                     -- 当前已发布配置副本；历史快照在 task_process
+  chunk_batch      INTEGER,                    -- 当前已发布有效批次，首次发布前 NULL
   uploader_id      TEXT,                     -- 操作者占位 [决策 6]，系统操作写 'system'
   import_time      TEXT    NOT NULL DEFAULT (datetime('now')),
   status           INTEGER NOT NULL DEFAULT 0 -- 0 启用 1 停用（停用不级联删除知识/切片/审核记录）
@@ -70,7 +74,7 @@ CREATE INDEX IF NOT EXISTS idx_source_document_file_hash    ON source_document (
 CREATE TABLE IF NOT EXISTS document_chunk (
   id                 INTEGER PRIMARY KEY AUTOINCREMENT,
   source_document_id INTEGER NOT NULL REFERENCES source_document(id),
-  chunk_batch        INTEGER NOT NULL DEFAULT 1,     -- 与 source_document.chunk_batch 对应
+  chunk_batch        INTEGER NOT NULL DEFAULT 1,     -- 任务绑定批次，可不同于文档当前有效批次
   chunk_index        INTEGER NOT NULL,               -- 片段在文档中的顺序
   content            TEXT    NOT NULL,               -- 原文片段内容（证据，非规范化知识）
   chunk_hash         TEXT    NOT NULL,               -- 规范化内容哈希，幂等复用判断
@@ -190,6 +194,9 @@ CREATE TABLE IF NOT EXISTS task_process (
   task_type          INTEGER NOT NULL,          -- 0 文档导入 1 索引同步
   -- 文档导入任务专用
   source_document_id INTEGER REFERENCES source_document(id),
+  chunk_batch        INTEGER CHECK (chunk_batch > 0), -- 固定批次；同步任务 NULL
+  parse_config       TEXT,                       -- 不可变解析配置快照
+  chunk_count        INTEGER CHECK (chunk_count >= 0), -- NULL 未发布，0 成功空批次
   -- 索引同步任务专用
   knowledge_id       INTEGER REFERENCES knowledge(id),
   version_id         INTEGER REFERENCES knowledge_version(id),
@@ -206,6 +213,12 @@ CREATE TABLE IF NOT EXISTS task_process (
 
 -- 后台轮询队列索引
 CREATE INDEX IF NOT EXISTS idx_task_process_queue ON task_process (task_type, status);
+
+-- 一个文档批次只属于一个导入任务；失败未发布仍占用该文档的解析槽。
+CREATE UNIQUE INDEX IF NOT EXISTS uk_task_document_batch
+  ON task_process (source_document_id, chunk_batch) WHERE task_type = 0;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_task_document_unpublished
+  ON task_process (source_document_id) WHERE task_type = 0 AND chunk_count IS NULL;
 
 
 -- ============================================================================

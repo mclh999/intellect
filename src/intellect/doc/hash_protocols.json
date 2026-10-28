@@ -1,0 +1,9 @@
+{
+  "chunk-v1": {
+    "algorithm": "sha256",
+    "encoding": "utf-8",
+    "errors": "strict",
+    "normalization": "identity",
+    "prefix": "chunk-v1:sha256:"
+  }
+}

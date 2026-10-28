@@ -1,5 +1,6 @@
--- 运行时 DDL：来源 document/Agent知识库-建表脚本V0.8.sql（DESIGN V0.8）
+-- 运行时 DDL：来源 document/Agent知识库-建表脚本V0.9.sql（DESIGN V0.9）
 -- PRAGMA 由连接工厂与初始化入口执行；不自动迁移已有事实库。
+-- V0.9：任务冻结抽取配置；候选标题/序号；成功检查点与候选集合原子提交。仅新库初始化。
 -- V0.8：切片词元统计口径见 DESIGN §3.3；DDL 与 V0.7 完全一致。
 -- V0.7：任务固定批次/配置，chunk_count 完整发布标记；仅新库初始化，旧事实库迁移另行评审。
 -- V0.6：初始哈希协议见 DESIGN §5.2；与 V0.5 DDL 一致，不需要结构迁移。
@@ -7,7 +8,7 @@
 -- 知识哈希使用固定分词资产，与 FTS 配置隔离；首次写入前交付协议清单与快照。
 -- V0.5：分类/别名规则见 DESIGN §3.8；与 V0.4 DDL 完全一致，不需要结构迁移。
 -- ============================================================================
--- Agent 知识库系统 建表脚本 V0.8
+-- Agent 知识库系统 建表脚本 V0.9
 -- V0.5：别名按统一比较规则保证同对象唯一；不新增停用字段。
 -- 执行前：每个连接注册 INTELLECT_ALIAS_V1，精确定义见 DESIGN §3.10。
 -- 本脚本用于新库初始化，不是 V0.3 事实库迁移脚本；禁止用重建事实库代替迁移。
@@ -22,6 +23,7 @@
 --   knowledge_category 知识分类关联表
 --   alias             别名表
 --   task_process      通用任务表（导入 + 索引同步）       [决策 1/9]
+--   extraction_result 抽取成功检查点（任务/切片唯一）
 --   candidate         候选知识表                         [决策 15]
 --   review_issue      审核事项表                         [决策 6/11]
 --   change_log        变更日志表                         [决策 6]
@@ -198,6 +200,7 @@ CREATE TABLE IF NOT EXISTS task_process (
   chunk_batch        INTEGER CHECK (chunk_batch > 0), -- 固定批次；同步任务 NULL
   parse_config       TEXT,                       -- 不可变解析配置快照
   chunk_count        INTEGER CHECK (chunk_count >= 0), -- NULL 未发布，0 成功空批次
+  extract_config     TEXT,                       -- 首次抽取前冻结；同步任务 NULL，不含密钥
   -- 索引同步任务专用
   knowledge_id       INTEGER REFERENCES knowledge(id),
   version_id         INTEGER REFERENCES knowledge_version(id),
@@ -227,6 +230,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_task_document_unpublished
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS candidate (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  title           TEXT,                       -- 同次模型输出；新抽取服务要求非空
+  extraction_index INTEGER CHECK (extraction_index >= 0), -- 新抽取从 0 连续；历史接口可空
   content         TEXT    NOT NULL,            -- 候选知识完整文本（历史抽取结果，不随正式知识修改而变化）
   task_process_id INTEGER NOT NULL REFERENCES task_process(id),
   chunk_id        INTEGER NOT NULL REFERENCES document_chunk(id),
@@ -236,6 +241,20 @@ CREATE TABLE IF NOT EXISTS candidate (
 );
 
 CREATE INDEX IF NOT EXISTS idx_candidate_task ON candidate (task_process_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_candidate_extraction
+  ON candidate (task_process_id, chunk_id, extraction_index) WHERE extraction_index IS NOT NULL;
+
+-- V0.9：只有完整成功才与候选集合一起写入；零候选记录 0。
+CREATE TABLE IF NOT EXISTS extraction_result (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  task_process_id INTEGER NOT NULL REFERENCES task_process(id),
+  chunk_id        INTEGER NOT NULL REFERENCES document_chunk(id),
+  candidate_count INTEGER NOT NULL CHECK (candidate_count >= 0),
+  create_time     TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (task_process_id, chunk_id)
+);
+
 
 
 -- ============================================================================

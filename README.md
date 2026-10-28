@@ -3,8 +3,8 @@
 以 SQLite 为唯一事实数据源、FTS5 + jieba 与向量检索混合召回的个人知识库，
 覆盖 **文档导入 → 知识抽取 → 混合检索 → 问答引用 → 审核 / 纠错 → 版本回滚** 完整闭环。
 
-- 权威设计稿：[document/DESIGN.md](document/DESIGN.md)（V0.8）
-- 表结构准绳：[document/Agent知识库-建表脚本V0.8.sql](document/Agent知识库-建表脚本V0.8.sql)
+- 权威设计稿：[document/DESIGN.md](document/DESIGN.md)（V0.9）
+- 表结构准绳：[document/Agent知识库-建表脚本V0.9.sql](document/Agent知识库-建表脚本V0.9.sql)
 - 协作规范：[AGENTS.md](AGENTS.md) · 任务清单：[document/TASK.md](document/TASK.md)
 
 ## 环境要求
@@ -48,8 +48,9 @@ API Key 一律经环境变量注入，不写入配置文件。
 uv run python -c "from intellect.db import initialize_database; initialize_database()"
 ```
 
-初始化会创建 V0.8 的 15 张业务表与 `knowledge_fts`，启用 WAL，并原子提交建表。
-V0.8 与 V0.7 DDL 一致，仅明确了切片词元统计口径。
+初始化会创建 V0.9 的 16 张业务表与 `knowledge_fts`，启用 WAL，并原子提交建表。
+V0.9 新增任务抽取配置、候选标题/输出序号与 `extraction_result` 成功检查点。
+V0.8 及以前事实库不会自动迁移；抽取服务遇到旧结构会明确报错，须另行评审迁移。
 V0.7 新增任务批次号、解析配置快照和切片完成数量，文档首次发布前有效批次为空。已有 V0.4–V0.6 数据库不会自动迁移；批次服务遇到旧结构会明确报错，不可通过重建事实库升级。
 目标库已有结构时会报错，已有事实库迁移须先评审；初始化失败不会删除数据库文件。
 运行时 SQL 随 Python 包发布，无需依赖本地 `document/` 目录。
@@ -149,7 +150,7 @@ uv run pytest
 - `save_chunks(task_id, [ChunkInput(...)])` 原子保存一组切片；已存在切片须原文、哈希、token_count 和位置元数据一致，才复用原切片 ID。上次已提交内容不受本次失败影响。
 - 只有解析成功读完输入后，才调用 `publish(task_id, expected_count=N)`。服务验证完整序号与哈希，再原子切换有效批次及配置；成功空结果用 N=0。不能用已写入行数推断解析完成。
 
-独立调用使用短写事务；外层已开启事务时使用保存点，提交/回滚由调用方决定。发布不改变整个导入任务状态，旧批次及配置继续保留。切片哈希采用随包 `hash_protocols.json` 固定的 chunk-v1 协议，保留所有原文字符；文件/正文/知识哈希及实际解析器已接入，候选抽取和 worker 仍待对应任务。
+独立调用使用短写事务；外层已开启事务时使用保存点，提交/回滚由调用方决定。发布不改变整个导入任务状态，旧批次及配置继续保留。切片哈希采用随包 `hash_protocols.json` 固定的 chunk-v1 协议，保留所有原文字符；文件/正文/知识哈希及实际解析器已接入，候选抽取见 T2.4，worker 尚待接入。
 
 ## 文档解析与切片（T2.1 / T2.2）
 
@@ -218,4 +219,33 @@ WEB 先归档，再传入本地路径、`kind="WEB"` 及响应编码对应的 `p
 文档与初始批次同事务登记，并发去重在写事务内复核；批次准备失败整体回滚。
 独立调用自行提交，外层事务由调用方提交或回滚。重试处理使用原任务 ID；重新解析同一文档时，
 使用 `DocumentProcessingService.create(existing_document_id)`，不重新登记来源。
-当前提供 Python 服务接口，入口尚未接入导入 UI、worker、拒绝审计或候选抽取。
+当前提供 Python 服务接口，入口尚未接入导入 UI、worker 或拒绝审计；可将已发布批次交给下述抽取服务。
+
+## LangChain 候选抽取（T2.4）
+
+将调用方配置好的 LangChain 模型 Runnable 注入适配器，并明确实际模型名称与版本：
+
+```python
+from intellect.extract.model import LangChainExtractor
+from intellect.extract.service import ExtractionService
+
+# model 是已配置的 LangChain Runnable；提供商、名称与版本须与实际模型一致
+extractor = LangChainExtractor(model, provider=provider, model_name=model_name, model_version=model_version)
+results = ExtractionService(connection, extractor).run(published.task_id)
+```
+
+版本化提示词要求每次完整输出 `{"items":[{"title":"标题","content":"完整正文"}]}`；
+没有知识时为 `{"items":[]}`。标题与正文必须非空，保留适用条件、例外和上下文；
+缺标题、截断 JSON、结构不符或调用失败均报 `ExtractionError`，不补标题或保存部分输出。
+未新增提供商客户端或自动选定模型，API Key 不进入数据库配置快照；真实模型调用尚未验收。
+
+仅处理完整发布的固定批次。模型调用前持久化实际模型/版本及提示词/结构版本与指纹；
+后续调用必须匹配快照。模型在写事务之外调用，提交时复核来源内容、哈希、元数据及任务配置。
+同一切片全部候选和成功检查点同事务提交；成功空结果保存数量 0，失败不留成功标记。
+重试核对完整集合后复用原候选 ID，跳过模型；并发只保留先成功的完整集合。
+记录损坏、候选缺检查点或配置不一致时报错，不自动覆盖。
+
+`run` 需要在调用方写事务外执行。需要组合外层事务时，可先 `prepare(task_id)` 得到来源快照，
+在事务外用 `extractor.invoke(source.content)` 获取输出，再于外层事务内
+`save_result(source, output)`；配置准备和结果提交均支持保存点，最终提交/回滚由调用方决定。
+候选保持待审核；本服务不改变任务状态，不创建正式知识、审核决策或索引同步任务。

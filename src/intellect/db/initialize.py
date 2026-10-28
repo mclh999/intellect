@@ -1,4 +1,4 @@
-"""新库初始化：V0.8 DDL 原子执行，不承担既有事实库迁移（T1.1）。"""
+"""新库初始化：V0.9 DDL 原子执行，不承担既有事实库迁移（T1.1）。"""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def _execute_schema(connection: sqlite3.Connection, schema: str) -> None:
 
 
 def initialize_database(path: str | Path | None = None) -> None:
-    """在空库创建 15 张业务表及 FTS5，已有结构时报错并保留原数据。
+    """在空库创建 16 张业务表及 FTS5，已有结构时报错并保留原数据。
 
     WAL 在 DDL 事务之前设置；表与索引在一个 BEGIN IMMEDIATE 事务中建立。
     失败仅回滚结构，不删除数据库文件；空库修正问题后可重试初始化。
@@ -63,4 +63,4 @@ def initialize_database(path: str | Path | None = None) -> None:
         ) from exc
     finally:
         connection.close()
-    logger.info("数据库 V0.8 初始化完成：%s", target)
+    logger.info("数据库 V0.9 初始化完成：%s", target)

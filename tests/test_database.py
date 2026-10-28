@@ -22,7 +22,7 @@ BUSINESS_TABLES = {
     "embedding_model", "source_document", "document_chunk", "knowledge",
     "knowledge_version", "knowledge_source", "category", "knowledge_category",
     "alias", "task_process", "candidate", "review_issue", "change_log",
-    "qa_record", "qa_citation",
+    "qa_record", "qa_citation", "extraction_result",
 }
 
 

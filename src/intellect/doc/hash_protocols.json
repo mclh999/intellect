@@ -11,6 +11,20 @@
     "normalization": "crlf-cr-to-lf",
     "prefix": "document-v1:sha256:"
   },
+  "knowledge-v1": {
+    "algorithm": "sha256",
+    "encoding": "utf-8",
+    "errors": "strict",
+    "normalization": "crlf-cr-to-lf",
+    "prefix": "knowledge-v1:sha256:",
+    "jieba_version": "0.42.1",
+    "dictionary_sha256": "7197c3211ddd98962b036cdf40324d1ea2bfaa12bd028e68faa70111a88e12a8",
+    "cut_all": false,
+    "HMM": false,
+    "include_whitespace": true,
+    "include_punctuation": true,
+    "serialization": {"format": "json-array", "ensure_ascii": false, "separators": [",", ":"]}
+  },
   "chunk-v1": {
     "algorithm": "sha256",
     "encoding": "utf-8",

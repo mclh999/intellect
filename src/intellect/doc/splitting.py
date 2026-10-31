@@ -15,6 +15,7 @@ SPLITTER_VERSION = "source-character-v1"
 
 
 def split_document(document: ParsedDocument, config: ChunkConfig, counter: ChunkTokenCounter) -> Iterator[ChunkInput]:
+    """执行 `split_document` 对应的功能并返回处理结果。 参数包括：`document`、`config`、`counter`。"""
     line_ends = [match.end() for match in re.finditer(r"\r\n|\r|\n", document.content)]
     index = 0
     for block in document.blocks:

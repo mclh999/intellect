@@ -31,9 +31,11 @@ class CategoryService:
     """复用调用方连接；独立调用原子提交，嵌入已有事务时使用保存点。"""
 
     def __init__(self, connection: sqlite3.Connection):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：`connection`。"""
         self.connection = connection
 
     def get(self, category_id: int) -> Category:
+        """执行 `get` 对应的功能并返回处理结果。 参数包括：`category_id`。"""
         require_id(category_id)
         row = self.connection.execute(
             "SELECT id, parent_id, name, status FROM category WHERE id = ?", (category_id,)
@@ -49,6 +51,7 @@ class CategoryService:
         )]
 
     def _check_parent(self, parent_id: int | None, category_id: int | None = None) -> None:
+        """执行 `check_parent` 所属的内部处理步骤。 参数包括：`parent_id`、`category_id`。"""
         visited = set()
         while parent_id is not None:
             if parent_id == category_id or parent_id in visited:
@@ -57,6 +60,7 @@ class CategoryService:
             parent_id = self.get(parent_id).parent_id
 
     def create(self, name: str, *, parent_id: int | None = None) -> Category:
+        """执行 `create` 对应的功能并返回处理结果。 参数包括：`name`、`parent_id`。"""
         require_text(name)
         with atomic(self.connection):
             self._check_parent(parent_id)
@@ -86,6 +90,7 @@ class CategoryService:
         return created
 
     def rename(self, category_id: int, name: str, *, reason: str, operator: str | None = None) -> Category:
+        """执行 `rename` 对应的功能并返回处理结果。 参数包括：`category_id`、`name`、`reason`、`operator`。"""
         require_text(name)
         require_reason(reason)
         with atomic(self.connection):
@@ -99,6 +104,7 @@ class CategoryService:
             return after
 
     def move(self, category_id: int, parent_id: int | None, *, reason: str, operator: str | None = None) -> Category:
+        """执行 `move` 对应的功能并返回处理结果。 参数包括：`category_id`、`parent_id`、`reason`、`operator`。"""
         require_reason(reason)
         with atomic(self.connection):
             before = self.get(category_id)
@@ -111,6 +117,7 @@ class CategoryService:
             return after
 
     def set_status(self, category_id: int, status: int, *, reason: str, operator: str | None = None) -> Category:
+        """执行 `set_status` 对应的功能并返回处理结果。 参数包括：`category_id`、`status`、`reason`、`operator`。"""
         require_enum(status, (0, 1))
         require_reason(reason)
         with atomic(self.connection):
@@ -124,6 +131,7 @@ class CategoryService:
             return after
 
     def delete(self, category_id: int, *, reason: str, operator: str | None = None) -> None:
+        """执行 `delete` 对应的功能并返回处理结果。 参数包括：`category_id`、`reason`、`operator`。"""
         require_reason(reason)
         with atomic(self.connection):
             category = self.get(category_id)
@@ -141,6 +149,7 @@ class CategoryService:
             log_category_change(self.connection, category_id, before, None, reason, operator)
 
     def attach_knowledge(self, category_id: int, knowledge_id: int) -> bool:
+        """执行 `attach_knowledge` 对应的功能并返回处理结果。 参数包括：`category_id`、`knowledge_id`。"""
         with atomic(self.connection):
             self.get(category_id)
             require_owner(self.connection, 0, knowledge_id)
@@ -156,6 +165,7 @@ class CategoryService:
             return True
 
     def detach_knowledge(self, category_id: int, knowledge_id: int) -> bool:
+        """执行 `detach_knowledge` 对应的功能并返回处理结果。 参数包括：`category_id`、`knowledge_id`。"""
         with atomic(self.connection):
             self.get(category_id)
             require_owner(self.connection, 0, knowledge_id)

@@ -28,6 +28,7 @@ class IntellectError(Exception):
     code: str = "INTELLECT_ERROR"
 
     def __init__(self, message: str, *, context: dict[str, Any] | None = None):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：`message`、`context`。"""
         super().__init__(message)
         self.message = message
         self.context: dict[str, Any] = dict(context or {})
@@ -46,6 +47,7 @@ class TaskExecutionError(IntellectError):
         task_type: int | None = None,
         context: dict[str, Any] | None = None,
     ):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：`message`、`task_id`、`task_type`、`context`。"""
         merged = dict(context or {})
         if task_id is not None:
             merged["task_id"] = task_id
@@ -61,6 +63,7 @@ class TaskErrorRecorder(Protocol):
     实现方须保证：error_info 写入与任务状态置"已失败"在同一事务内完成。
     """
 
+    """记录任务失败信息，并由实现方确保与失败状态在同一事务写入。"""
     def record_error(self, task_id: int, error_info: str) -> None: ...
 
 

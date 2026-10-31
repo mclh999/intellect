@@ -17,6 +17,7 @@ from intellect.doc.processing import DocumentProcessingError
 
 @pytest.fixture
 def database_path(tmp_path):
+    """执行 `database_path` 对应的功能并返回处理结果。 参数包括：`tmp_path`。"""
     path = tmp_path / "imports.db"
     initialize_database(path)
     return path
@@ -24,11 +25,13 @@ def database_path(tmp_path):
 
 @pytest.fixture
 def connection(database_path):
+    """执行 `connection` 对应的功能并返回处理结果。 参数包括：`database_path`。"""
     with closing(connect_database(database_path)) as connection:
         yield connection
 
 
 def archive(tmp_path, name="first.txt", data=b"Alpha\r\nBeta"):
+    """执行 `archive` 对应的功能并返回处理结果。 参数包括：`tmp_path`、`name`、`data`。"""
     path = tmp_path / name
     path.write_bytes(data)
     return path
@@ -36,6 +39,7 @@ def archive(tmp_path, name="first.txt", data=b"Alpha\r\nBeta"):
 
 class TestFileDeduplication:
     def test_truthy_text_cannot_replace_explicit_confirmation(self, connection, tmp_path):
+        """验证 `truthy_text_cannot_replace_explicit_confirmation` 所代表的行为。 参数包括：`connection`、`tmp_path`。"""
         path = archive(tmp_path)
         service = DocumentImportService(connection)
         service.register(path, title="原件", kind="TXT")
@@ -44,6 +48,7 @@ class TestFileDeduplication:
         assert connection.execute("SELECT count(*) FROM source_document").fetchone()[0] == 1
 
     def test_same_file_default_rejected_without_new_records(self, connection, tmp_path):
+        """验证 `same_file_default_rejected_without_new_records` 所代表的行为。 参数包括：`connection`、`tmp_path`。"""
         path = archive(tmp_path)
         service = DocumentImportService(connection)
         first = service.register(path, title="原文档", kind="TXT")
@@ -57,6 +62,7 @@ class TestFileDeduplication:
         assert connection.execute("SELECT count(*) FROM task_process").fetchone()[0] == 1
 
     def test_same_body_different_file_default_rejected(self, connection, tmp_path):
+        """验证 `same_body_different_file_default_rejected` 所代表的行为。 参数包括：`connection`、`tmp_path`。"""
         service = DocumentImportService(connection)
         first = service.register(archive(tmp_path), title="CRLF", kind="TXT")
         other = archive(tmp_path, "second.txt", b"Alpha\nBeta")
@@ -67,6 +73,7 @@ class TestFileDeduplication:
         assert not caught.value.context["documents"][0]["same_file"]
 
     def test_explicit_confirmation_preserves_independent_sources(self, connection, tmp_path):
+        """验证 `explicit_confirmation_preserves_independent_sources` 所代表的行为。 参数包括：`connection`、`tmp_path`。"""
         service = DocumentImportService(connection)
         first = service.register(archive(tmp_path), title="原来源", kind="TXT")
         second_path = archive(tmp_path, "second.txt", b"Alpha\nBeta")
@@ -82,6 +89,7 @@ class TestFileDeduplication:
         assert connection.execute("SELECT count(DISTINCT content_hash) FROM source_document").fetchone()[0] == 1
 
     def test_inactive_documents_do_not_block_new_source(self, connection, tmp_path):
+        """验证 `inactive_documents_do_not_block_new_source` 所代表的行为。 参数包括：`connection`、`tmp_path`。"""
         path = archive(tmp_path)
         service = DocumentImportService(connection)
         first = service.register(path, title="旧来源", kind="TXT")
@@ -93,6 +101,7 @@ class TestFileDeduplication:
 
     def test_file_hash_compared_after_body_match_not_as_global_shortcut(self, connection, tmp_path):
         # 相同原始字节用不同解析器产生不同正文；按 §5.1 正文未命中正常登记。
+        """验证 `file_hash_compared_after_body_match_not_as_global_shortcut` 所代表的行为。 参数包括：`connection`、`tmp_path`。"""
         path = archive(tmp_path, "page.html", b"<p>Alpha</p>")
         service = DocumentImportService(connection)
         html = service.register(path, title="HTML", kind="WEB")
@@ -101,6 +110,7 @@ class TestFileDeduplication:
         assert connection.execute("SELECT count(DISTINCT file_hash),count(DISTINCT content_hash) FROM source_document").fetchone() == (1, 2)
 
     def test_all_matching_active_documents_are_shown(self, connection, tmp_path):
+        """验证 `all_matching_active_documents_are_shown` 所代表的行为。 参数包括：`connection`、`tmp_path`。"""
         path = archive(tmp_path)
         service = DocumentImportService(connection)
         one = service.register(path, title="一", kind="TXT")
@@ -110,6 +120,7 @@ class TestFileDeduplication:
         assert [row["id"] for row in caught.value.context["documents"]] == [one.document_id, two.document_id]
 
     def test_empty_parsed_body_still_uses_content_deduplication(self, connection, tmp_path):
+        """验证 `empty_parsed_body_still_uses_content_deduplication` 所代表的行为。 参数包括：`connection`、`tmp_path`。"""
         path = archive(tmp_path, data=b"")
         service = DocumentImportService(connection)
         service.register(path, title="空文档", kind="TXT")
@@ -119,6 +130,7 @@ class TestFileDeduplication:
 
 class TestRegistrationTransaction:
     def test_explicit_encoding_is_shared_by_inspection_and_task_snapshot(self, connection, tmp_path):
+        """验证 `explicit_encoding_is_shared_by_inspection_and_task_snapshot` 所代表的行为。 参数包括：`connection`、`tmp_path`。"""
         path = archive(tmp_path, data="中文归档".encode("gb18030"))
         service = DocumentImportService(connection)
         result = service.register(path, title="GB 编码", kind="TXT", parser_options={"encoding":"gb18030"})
@@ -127,6 +139,7 @@ class TestRegistrationTransaction:
         assert connection.execute("SELECT content_hash FROM source_document").fetchone()[0] == document_hash("中文归档")
 
     def test_metadata_and_snapshot_registered_before_chunks(self, connection, tmp_path):
+        """验证 `metadata_and_snapshot_registered_before_chunks` 所代表的行为。 参数包括：`connection`、`tmp_path`。"""
         path = archive(tmp_path)
         result = DocumentImportService(connection).register(path, title="文档", kind="TXT", uploader="system")
         assert connection.execute("SELECT storage_url,file_hash,content_hash,file_size,uploader_id,chunk_batch FROM source_document").fetchone() == (
@@ -137,8 +150,10 @@ class TestRegistrationTransaction:
         assert connection.execute("SELECT count(*) FROM knowledge").fetchone()[0] == 0
 
     def test_batch_creation_failure_rolls_back_document(self, connection, tmp_path, monkeypatch):
+        """验证 `batch_creation_failure_rolls_back_document` 所代表的行为。 参数包括：`connection`、`tmp_path`、`monkeypatch`。"""
         service = DocumentImportService(connection)
         def fail(*args, **kwargs):
+            """执行 `fail` 对应的功能并返回处理结果。 参数包括：`*args`、`**kwargs`。"""
             raise RuntimeError("准备批次失败")
         monkeypatch.setattr(service.processing, "create", fail)
         with pytest.raises(RuntimeError):
@@ -147,9 +162,11 @@ class TestRegistrationTransaction:
         assert connection.execute("SELECT count(*) FROM task_process").fetchone()[0] == 0
 
     def test_archive_changed_between_inspection_and_registration_rolls_back(self, connection, tmp_path, monkeypatch):
+        """验证 `archive_changed_between_inspection_and_registration_rolls_back` 所代表的行为。 参数包括：`connection`、`tmp_path`、`monkeypatch`。"""
         path = archive(tmp_path)
         real_inspect = importing.inspect_bytes
         def inspect_then_change(*args, **kwargs):
+            """执行 `inspect_then_change` 对应的功能并返回处理结果。 参数包括：`*args`、`**kwargs`。"""
             result = real_inspect(*args, **kwargs)
             path.write_bytes(b"changed")
             return result
@@ -159,6 +176,7 @@ class TestRegistrationTransaction:
         assert connection.execute("SELECT count(*) FROM source_document").fetchone()[0] == 0
 
     def test_outer_rollback_includes_document_and_task(self, connection, tmp_path, database_path):
+        """验证 `outer_rollback_includes_document_and_task` 所代表的行为。 参数包括：`connection`、`tmp_path`、`database_path`。"""
         connection.execute("BEGIN IMMEDIATE")
         DocumentImportService(connection).register(archive(tmp_path), title="外层", kind="TXT")
         assert connection.in_transaction
@@ -169,9 +187,11 @@ class TestRegistrationTransaction:
         assert connection.execute("SELECT count(*) FROM task_process").fetchone()[0] == 0
 
     def test_concurrent_identical_files_only_register_once_without_confirmation(self, database_path, tmp_path):
+        """验证 `concurrent_identical_files_only_register_once_without_confirmation` 所代表的行为。 参数包括：`database_path`、`tmp_path`。"""
         path = archive(tmp_path)
         barrier = Barrier(2)
         def register():
+            """执行 `register` 对应的功能并返回处理结果。 参数包括：无显式参数。"""
             with closing(connect_database(database_path)) as connection:
                 barrier.wait(timeout=10)
                 try:

@@ -1,4 +1,4 @@
--- 运行时 DDL：来源 document/Agent知识库-建表脚本V0.9.sql（DESIGN V0.9）
+-- 运行时 DDL：来源 document/sql建表脚本.sql（DESIGN V0.11）
 -- PRAGMA 由连接工厂与初始化入口执行；不自动迁移已有事实库。
 -- V0.9：任务冻结抽取配置；候选标题/序号；成功检查点与候选集合原子提交。仅新库初始化。
 -- V0.8：切片词元统计口径见 DESIGN §3.3；DDL 与 V0.7 完全一致。
@@ -13,6 +13,7 @@
 -- 执行前：每个连接注册 INTELLECT_ALIAS_V1，精确定义见 DESIGN §3.10。
 -- 本脚本用于新库初始化，不是 V0.3 事实库迁移脚本；禁止用重建事实库代替迁移。
 -- 表清单：
+--   user              用户与角色表
 --   embedding_model   向量模型注册表                    [决策 5a]
 --   source_document   原始文档表                        [决策 10/13/6]
 --   document_chunk    原文切片表                        [决策 10]
@@ -33,6 +34,17 @@
 -- ============================================================================
 
 
+
+-- 用户表：测试管理员之外的 ID 由应用雪花算法生成。
+CREATE TABLE IF NOT EXISTS "user" (
+  id          INTEGER NOT NULL PRIMARY KEY CHECK (id > 0),
+  name        TEXT NOT NULL UNIQUE CHECK (length(trim(name)) > 0),
+  password    TEXT NOT NULL CHECK (length(password) > 0),
+  permissions INTEGER NOT NULL CHECK (permissions IN (0, 1))
+) WITHOUT ROWID;
+
+INSERT INTO "user" (id, name, password, permissions)
+VALUES (1, 'admin', 'pbkdf2_sha256$600000$b45d2029d6659902c758a5109f02eae1$3ab5f51be1309c98c87bedacfcc8c1bc7d1db862ddf8ce53ad79fbd04dd74629', 0);
 
 -- ============================================================================
 -- 1. embedding_model 向量模型注册表

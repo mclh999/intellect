@@ -28,11 +28,13 @@ class KnowledgeHashError(IntellectError):
 
 class _HashTokenizer(jieba.Tokenizer):
     def __init__(self, dictionary: bytes):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：`dictionary`。"""
         super().__init__()
         self._snapshot = dictionary
         self.cache_file = "intellect-knowledge-v1-" + _PROTOCOL["dictionary_sha256"] + ".cache"
 
     def get_dict_file(self):
+        """执行 `get_dict_file` 对应的功能并返回处理结果。 参数包括：无显式参数。"""
         return io.BytesIO(self._snapshot)
 
 
@@ -40,6 +42,7 @@ class KnowledgeHasher:
     """独立实例从随包快照加载，不使用 FTS 用户词典或停用词。"""
 
     def __init__(self):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：无显式参数。"""
         try:
             resources = files("intellect.doc")
             manifest = json.loads(resources.joinpath("hash_protocols.json").read_text(encoding="utf-8"))
@@ -53,9 +56,11 @@ class KnowledgeHasher:
 
     @property
     def manifest(self) -> dict:
+        """执行 `manifest` 对应的功能并返回处理结果。 参数包括：无显式参数。"""
         return json.loads(json.dumps(_PROTOCOL))
 
     def hash(self, content: str) -> str:
+        """执行 `hash` 对应的功能并返回处理结果。 参数包括：`content`。"""
         if not isinstance(content, str):
             raise KnowledgeHashError("知识哈希输入必须是完整正文字符串")
         normalized = content.replace("\r\n", "\n").replace("\r", "\n")
@@ -72,6 +77,7 @@ class KnowledgeHasher:
 
 @lru_cache(maxsize=1)
 def get_knowledge_hasher() -> KnowledgeHasher:
+    """执行 `get_knowledge_hasher` 对应的功能并返回处理结果。 参数包括：无显式参数。"""
     return KnowledgeHasher()
 
 

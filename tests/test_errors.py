@@ -15,12 +15,14 @@ from intellect.core.errors import (
 
 class TestIntellectError:
     def test_code_and_context(self):
+        """验证 `code_and_context` 所代表的行为。 参数包括：无显式参数。"""
         err = IntellectError("解析失败", context={"doc_id": 7})
         assert err.code == "INTELLECT_ERROR"
         assert err.message == "解析失败"
         assert err.context == {"doc_id": 7}
 
     def test_task_error_carries_task_context(self):
+        """验证 `task_error_carries_task_context` 所代表的行为。 参数包括：无显式参数。"""
         err = TaskExecutionError("嵌入超时", task_id=42, task_type=1)
         assert err.code == "TASK_EXECUTION_FAILED"
         assert err.context == {"task_id": 42, "task_type": 1}
@@ -28,6 +30,7 @@ class TestIntellectError:
 
 class TestBuildErrorInfo:
     def test_non_json_context_keeps_error_recordable(self):
+        """验证 `non_json_context_keeps_error_recordable` 所代表的行为。 参数包括：无显式参数。"""
         info = json.loads(build_error_info(IntellectError(
             "文件读取失败", context={"path": Path("source/document.txt")}
         )))
@@ -35,6 +38,7 @@ class TestBuildErrorInfo:
         assert info["context"]["path"] == str(Path("source/document.txt"))
 
     def test_payload_fields(self):
+        """验证 `payload_fields` 所代表的行为。 参数包括：无显式参数。"""
         try:
             raise TaskExecutionError("嵌入超时", task_id=42, task_type=1)
         except TaskExecutionError as exc:
@@ -47,6 +51,7 @@ class TestBuildErrorInfo:
         assert "test_errors.py" in info["traceback"]
 
     def test_plain_exception_uses_type_name_as_code(self):
+        """验证 `plain_exception_uses_type_name_as_code` 所代表的行为。 参数包括：无显式参数。"""
         try:
             raise ValueError("boom")
         except ValueError as exc:
@@ -56,6 +61,7 @@ class TestBuildErrorInfo:
 
     def test_long_traceback_trimmed(self):
         # 用异常链构造长堆栈：递归帧会被 Python 折叠，链式 raise 每节都完整保留
+        """验证 `long_traceback_trimmed` 所代表的行为。 参数包括：无显式参数。"""
         chained: BaseException = ValueError("root")
         for i in range(15):
             try:
@@ -75,8 +81,10 @@ class TestBuildErrorInfo:
 
 class TestRecorderProtocol:
     def test_protocol_implementable(self):
+        """验证 `protocol_implementable` 所代表的行为。 参数包括：无显式参数。"""
         class DbRecorder:
             def record_error(self, task_id: int, error_info: str) -> None:
+                """执行 `record_error` 对应的功能并返回处理结果。 参数包括：`task_id`、`error_info`。"""
                 pass
 
         assert isinstance(DbRecorder(), TaskErrorRecorder)

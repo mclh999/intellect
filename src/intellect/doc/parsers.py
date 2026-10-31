@@ -40,12 +40,14 @@ class DocumentInspection:
 
 
 def source_type(value: str) -> str:
+    """执行 `source_type` 对应的功能并返回处理结果。 参数包括：`value`。"""
     if not isinstance(value, str) or value.upper() not in {"TXT", "PDF", "DOCX", "WEB"}:
         raise DocumentParseError("不支持的文档类型", context={"source_type": value})
     return value.upper()
 
 
 def parser_version(kind: str) -> str:
+    """执行 `parser_version` 对应的功能并返回处理结果。 参数包括：`kind`。"""
     kind = source_type(kind)
     backend = {"PDF": "pypdf", "DOCX": "python-docx"}.get(kind)
     library = f"/{backend}-{version(backend)}" if backend else ""
@@ -55,10 +57,12 @@ def parser_version(kind: str) -> str:
 
 
 def default_options(kind: str) -> dict:
+    """执行 `default_options` 对应的功能并返回处理结果。 参数包括：`kind`。"""
     return {"encoding": get_settings().document.text_encoding} if source_type(kind) in {"TXT", "WEB"} else {}
 
 
 def validate_options(kind: str, options: dict) -> None:
+    """执行 `validate_options` 对应的功能并返回处理结果。 参数包括：`kind`、`options`。"""
     expected = {"encoding"} if source_type(kind) in {"TXT", "WEB"} else set()
     if not isinstance(options, dict) or set(options) != expected:
         raise DocumentParseError("解析器参数缺失或含未知字段")
@@ -73,6 +77,7 @@ def validate_options(kind: str, options: dict) -> None:
 
 
 def _assemble(parts: list[tuple[str, dict]]) -> ParsedDocument:
+    """执行 `assemble` 所属的内部处理步骤。 参数包括：`parts`。"""
     blocks = []
     start = 0
     for index, (text, location) in enumerate(parts):
@@ -88,21 +93,25 @@ class _HtmlText(HTMLParser):
     _IGNORED = {"script", "style", "template"}
 
     def __init__(self):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：无显式参数。"""
         super().__init__(convert_charrefs=True)
         self.parts = []
         self.ignored = []
 
     def _break(self):
+        """执行 `break` 所属的内部处理步骤。 参数包括：无显式参数。"""
         if self.parts and not self.parts[-1].endswith("\n"):
             self.parts.append("\n")
 
     def handle_starttag(self, tag, attrs):
+        """执行 `handle_starttag` 对应的功能并返回处理结果。 参数包括：`tag`、`attrs`。"""
         if tag in self._IGNORED:
             self.ignored.append(tag)
         elif not self.ignored and tag in self._BLOCKS:
             self._break()
 
     def handle_endtag(self, tag):
+        """执行 `handle_endtag` 对应的功能并返回处理结果。 参数包括：`tag`。"""
         if self.ignored:
             if self.ignored[-1] == tag:
                 self.ignored.pop()
@@ -110,17 +119,20 @@ class _HtmlText(HTMLParser):
             self._break()
 
     def handle_data(self, data):
+        """执行 `handle_data` 对应的功能并返回处理结果。 参数包括：`data`。"""
         if not self.ignored:
             self.parts.append(data)
 
 
 def _docx_parts(document) -> list[tuple[str, dict]]:
+    """执行 `docx_parts` 所属的内部处理步骤。 参数包括：`document`。"""
     from docx.table import Table
     from docx.text.paragraph import Paragraph
 
     parts = []
 
     def visit(container, location):
+        """执行 `visit` 对应的功能并返回处理结果。 参数包括：`container`、`location`。"""
         paragraph_no = table_no = 0
         for item in container.iter_inner_content():
             if isinstance(item, Paragraph):
@@ -142,6 +154,7 @@ def _docx_parts(document) -> list[tuple[str, dict]]:
 
 
 def parse_bytes(content: bytes, kind: str, *, options: dict | None = None) -> ParsedDocument:
+    """执行 `parse_bytes` 对应的功能并返回处理结果。 参数包括：`content`、`kind`、`options`。"""
     kind = source_type(kind)
     options = options if options is not None else default_options(kind)
     validate_options(kind, options)

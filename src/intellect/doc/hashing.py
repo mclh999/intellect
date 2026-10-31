@@ -16,6 +16,7 @@ class ChunkHashError(IntellectError):
 
 @lru_cache(maxsize=1)
 def _prefix() -> str:
+    """执行 `prefix` 所属的内部处理步骤。 参数包括：无显式参数。"""
     expected = {
         "algorithm": "sha256", "encoding": "utf-8", "errors": "strict",
         "normalization": "identity", "prefix": "chunk-v1:sha256:",
@@ -46,6 +47,7 @@ class DocumentHashError(IntellectError):
 
 @lru_cache(maxsize=2)
 def _document_prefix(protocol: str) -> str:
+    """执行 `document_prefix` 所属的内部处理步骤。 参数包括：`protocol`。"""
     expected = {"algorithm": "sha256", "prefix": f"{protocol}:sha256:"}
     if protocol == "file-v1":
         expected["input"] = "original-bytes"
@@ -63,12 +65,14 @@ def _document_prefix(protocol: str) -> str:
 
 
 def file_hash(content: bytes) -> str:
+    """执行 `file_hash` 对应的功能并返回处理结果。 参数包括：`content`。"""
     if not isinstance(content, bytes):
         raise DocumentHashError("原文件哈希必须使用原始字节")
     return _document_prefix("file-v1") + hashlib.sha256(content).hexdigest()
 
 
 def document_hash(text: str) -> str:
+    """执行 `document_hash` 对应的功能并返回处理结果。 参数包括：`text`。"""
     if not isinstance(text, str):
         raise DocumentHashError("文档正文必须为字符串")
     try:

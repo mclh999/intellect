@@ -25,9 +25,11 @@ OUTPUT = {"items": [{"title": "  条件标题  ", "content": "若 x > 0，则 A�
 
 class ModelStub:
     def __init__(self, output=OUTPUT, callback=None):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：`output`、`callback`。"""
         self.output, self.callback, self.calls = output, callback, []
 
     def invoke(self, prompt):
+        """执行 `invoke` 对应的功能并返回处理结果。 参数包括：`prompt`。"""
         self.calls.append(prompt.to_messages())
         if self.callback:
             self.callback()
@@ -36,11 +38,13 @@ class ModelStub:
         return AIMessage(content=self.output if isinstance(self.output, str) else json.dumps(self.output, ensure_ascii=False))
 
     def adapter(self, version="2026-10-28"):
+        """执行 `adapter` 对应的功能并返回处理结果。 参数包括：`version`。"""
         return LangChainExtractor(RunnableLambda(self.invoke), provider="test", model_name="fake", model_version=version)
 
 
 @pytest.fixture
 def database_path(tmp_path):
+    """执行 `database_path` 对应的功能并返回处理结果。 参数包括：`tmp_path`。"""
     path = tmp_path / "extraction.db"
     initialize_database(path)
     return path
@@ -48,11 +52,13 @@ def database_path(tmp_path):
 
 @pytest.fixture
 def connection(database_path):
+    """执行 `connection` 对应的功能并返回处理结果。 参数包括：`database_path`。"""
     with closing(connect_database(database_path)) as connection:
         yield connection
 
 
 def batch(connection, texts=("来源一：条件与例外",)):
+    """执行 `batch` 对应的功能并返回处理结果。 参数包括：`connection`、`texts`。"""
     with connection:
         document_id = connection.execute("INSERT INTO source_document (title,storage_url,content_hash) VALUES ('资料','file:///source','test')").lastrowid
     batches = DocumentBatchService(connection)
@@ -62,12 +68,14 @@ def batch(connection, texts=("来源一：条件与例外",)):
 
 
 def counts(connection):
+    """执行 `counts` 对应的功能并返回处理结果。 参数包括：`connection`。"""
     return tuple(connection.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
                  for table in ("candidate", "extraction_result"))
 
 
 class TestLangChainOutput:
     def test_full_title_body_and_prompt_source_are_preserved(self, connection):
+        """验证 `full_title_body_and_prompt_source_are_preserved` 所代表的行为。 参数包括：`connection`。"""
         task = batch(connection)
         model = ModelStub()
         result = ExtractionService(connection, model.adapter()).run(task.task_id)[0]
@@ -89,6 +97,7 @@ class TestLangChainOutput:
         '{"items":[],"items":[]}', '{"items":NaN}',
     ])
     def test_incomplete_or_invalid_output_never_marks_success(self, connection, output):
+        """验证 `incomplete_or_invalid_output_never_marks_success` 所代表的行为。 参数包括：`connection`、`output`。"""
         task = batch(connection)
         with pytest.raises(ExtractionError):
             ExtractionService(connection, ModelStub(output).adapter()).run(task.task_id)
@@ -96,6 +105,7 @@ class TestLangChainOutput:
         assert connection.execute("SELECT extract_config FROM task_process").fetchone()[0] is not None
 
     def test_error_leaves_no_checkpoint_and_retry_can_call_model_again(self, connection):
+        """验证 `error_leaves_no_checkpoint_and_retry_can_call_model_again` 所代表的行为。 参数包括：`connection`。"""
         task = batch(connection)
         model = ModelStub(RuntimeError("provider unavailable"))
         service = ExtractionService(connection, model.adapter())
@@ -111,12 +121,14 @@ class TestLangChainOutput:
     @pytest.mark.parametrize("fields", [dict(provider="",model_name="x",model_version="1"),
                                          dict(provider="test",model_name="x",model_version="")])
     def test_version_identity_is_required(self, fields):
+        """验证 `version_identity_is_required` 所代表的行为。 参数包括：`fields`。"""
         with pytest.raises(ExtractionError):
             LangChainExtractor(RunnableLambda(lambda _: ''), **fields)
 
 
 class TestExtractionRetries:
     def test_zero_candidates_is_success_and_never_invokes_again(self, connection):
+        """验证 `zero_candidates_is_success_and_never_invokes_again` 所代表的行为。 参数包括：`connection`。"""
         task = batch(connection)
         model = ModelStub({"items":[]})
         service = ExtractionService(connection, model.adapter())
@@ -126,6 +138,7 @@ class TestExtractionRetries:
         assert connection.execute("SELECT candidate_count FROM extraction_result").fetchone() == (0,)
 
     def test_empty_published_batch_freezes_config_without_model_call(self, connection):
+        """验证 `empty_published_batch_freezes_config_without_model_call` 所代表的行为。 参数包括：`connection`。"""
         task = batch(connection, ())
         model = ModelStub()
         assert ExtractionService(connection,model.adapter()).run(task.task_id) == ()
@@ -133,6 +146,7 @@ class TestExtractionRetries:
         assert connection.execute("SELECT extract_config FROM task_process").fetchone()[0]
 
     def test_successful_candidates_reused_even_after_review_status_changes(self, connection):
+        """验证 `successful_candidates_reused_even_after_review_status_changes` 所代表的行为。 参数包括：`connection`。"""
         task = batch(connection)
         model = ModelStub()
         service = ExtractionService(connection,model.adapter())
@@ -143,9 +157,11 @@ class TestExtractionRetries:
         assert len(model.calls) == 1
 
     def test_partial_task_retry_only_invokes_missing_chunk(self, connection):
+        """验证 `partial_task_retry_only_invokes_missing_chunk` 所代表的行为。 参数包括：`connection`。"""
         task = batch(connection,("来源一","来源二"))
         model = ModelStub()
         def fail_second():
+            """执行 `fail_second` 对应的功能并返回处理结果。 参数包括：无显式参数。"""
             if len(model.calls)==2:
                 raise RuntimeError("中断")
         model.callback=fail_second
@@ -160,6 +176,7 @@ class TestExtractionRetries:
         assert connection.execute("SELECT id FROM candidate ORDER BY id LIMIT 2").fetchall()==first_ids
 
     def test_changed_model_or_prompt_config_is_rejected_before_model(self, connection):
+        """验证 `changed_model_or_prompt_config_is_rejected_before_model` 所代表的行为。 参数包括：`connection`。"""
         task=batch(connection)
         model=ModelStub()
         service=ExtractionService(connection,model.adapter())
@@ -175,6 +192,7 @@ class TestExtractionRetries:
 
     @pytest.mark.parametrize("damage",["missing_checkpoint","count","sequence","model","title","foreign_chunk"])
     def test_corrupt_results_fail_closed(self,connection,damage):
+        """验证 `corrupt_results_fail_closed` 所代表的行为。 参数包括：`connection`、`damage`。"""
         task=batch(connection)
         model=ModelStub()
         service=ExtractionService(connection,model.adapter())
@@ -196,6 +214,7 @@ class TestExtractionRetries:
 class TestAtomicExtraction:
     @pytest.mark.parametrize("stage",["second_candidate","checkpoint"])
     def test_failure_rolls_back_entire_result(self,connection,stage):
+        """验证 `failure_rolls_back_entire_result` 所代表的行为。 参数包括：`connection`、`stage`。"""
         task=batch(connection)
         if stage=="second_candidate":
             sql="CREATE TRIGGER fail_insert BEFORE INSERT ON candidate WHEN NEW.extraction_index=1 BEGIN SELECT RAISE(ABORT,'fault'); END"
@@ -207,8 +226,10 @@ class TestAtomicExtraction:
         assert counts(connection)==(0,0)
 
     def test_model_call_is_outside_write_transaction_and_config_already_visible(self,connection,database_path):
+        """验证 `model_call_is_outside_write_transaction_and_config_already_visible` 所代表的行为。 参数包括：`connection`、`database_path`。"""
         task=batch(connection)
         def check():
+            """执行 `check` 对应的功能并返回处理结果。 参数包括：无显式参数。"""
             assert not connection.in_transaction
             with closing(connect_database(database_path)) as other, other:
                 assert other.execute("SELECT extract_config FROM task_process").fetchone()[0]
@@ -217,8 +238,10 @@ class TestAtomicExtraction:
 
     @pytest.mark.parametrize("field",["content","metadata","parse_config","extract_config","status"])
     def test_changed_source_during_model_call_cannot_commit(self,connection,field):
+        """验证 `changed_source_during_model_call_cannot_commit` 所代表的行为。 参数包括：`connection`、`field`。"""
         task=batch(connection)
         def mutate():
+            """执行 `mutate` 对应的功能并返回处理结果。 参数包括：无显式参数。"""
             with connection:
                 if field=="content": connection.execute("UPDATE document_chunk SET content='changed'")
                 elif field=="metadata": connection.execute("UPDATE document_chunk SET location_meta='{}'")
@@ -230,6 +253,7 @@ class TestAtomicExtraction:
         assert counts(connection)==(0,0)
 
     def test_outer_transaction_result_rollback_and_model_call_rejected(self,connection):
+        """验证 `outer_transaction_result_rollback_and_model_call_rejected` 所代表的行为。 参数包括：`connection`。"""
         task=batch(connection)
         model=ModelStub()
         service=ExtractionService(connection,model.adapter())
@@ -247,9 +271,11 @@ class TestAtomicExtraction:
         assert len(model.calls)==1
 
     def test_concurrent_result_commit_reuses_first_complete_group(self,database_path,connection):
+        """验证 `concurrent_result_commit_reuses_first_complete_group` 所代表的行为。 参数包括：`database_path`、`connection`。"""
         task=batch(connection)
         barrier=Barrier(2)
         def run():
+            """执行 `run` 对应的功能并返回处理结果。 参数包括：无显式参数。"""
             with closing(connect_database(database_path)) as db:
                 model=ModelStub(callback=lambda: barrier.wait(timeout=10))
                 return ExtractionService(db,model.adapter()).run(task.task_id)
@@ -258,6 +284,7 @@ class TestAtomicExtraction:
         assert outputs[0]==outputs[1] and counts(connection)==(2,1)
 
     def test_unpublished_batch_and_forged_ownership_are_rejected(self,connection):
+        """验证 `unpublished_batch_and_forged_ownership_are_rejected` 所代表的行为。 参数包括：`connection`。"""
         task=batch(connection)
         service=ExtractionService(connection,ModelStub().adapter())
         source=service.prepare(task.task_id)[0]
@@ -267,6 +294,7 @@ class TestAtomicExtraction:
             service.run(task.task_id)
 
     def test_legacy_database_is_not_automatically_migrated(self,tmp_path):
+        """验证 `legacy_database_is_not_automatically_migrated` 所代表的行为。 参数包括：`tmp_path`。"""
         path=tmp_path/'legacy.db'
         with closing(sqlite3.connect(path)) as db, db:
             db.execute("CREATE TABLE task_process (id INTEGER PRIMARY KEY)")
@@ -277,6 +305,7 @@ class TestAtomicExtraction:
 
 class TestExtractionSchema:
     def test_unique_checkpoint_candidate_indices_and_nonnegative_counts(self,connection):
+        """验证 `unique_checkpoint_candidate_indices_and_nonnegative_counts` 所代表的行为。 参数包括：`connection`。"""
         task=batch(connection)
         ExtractionService(connection,ModelStub().adapter()).run(task.task_id)
         chunk_id=connection.execute('SELECT id FROM document_chunk').fetchone()[0]
@@ -295,6 +324,7 @@ class TestExtractionSchema:
         assert connection.execute('PRAGMA foreign_key_check').fetchall()==[]
 
     def test_nullable_legacy_fields_do_not_qualify_for_new_success(self,connection):
+        """验证 `nullable_legacy_fields_do_not_qualify_for_new_success` 所代表的行为。 参数包括：`connection`。"""
         task=batch(connection)
         service=ExtractionService(connection,ModelStub().adapter())
         source=service.prepare(task.task_id)[0]
@@ -305,6 +335,7 @@ class TestExtractionSchema:
             service.run(task.task_id)
 
     def test_unbound_task_cannot_adopt_existing_success_records(self,connection):
+        """验证 `unbound_task_cannot_adopt_existing_success_records` 所代表的行为。 参数包括：`connection`。"""
         task=batch(connection)
         chunk_id=connection.execute('SELECT id FROM document_chunk').fetchone()[0]
         with connection:
@@ -313,6 +344,7 @@ class TestExtractionSchema:
             ExtractionService(connection,ModelStub().adapter()).run(task.task_id)
 
     def test_prepare_configuration_is_rolled_back_with_outer_transaction(self,connection):
+        """验证 `prepare_configuration_is_rolled_back_with_outer_transaction` 所代表的行为。 参数包括：`connection`。"""
         task=batch(connection)
         connection.execute('BEGIN IMMEDIATE')
         ExtractionService(connection,ModelStub().adapter()).prepare(task.task_id)
@@ -320,6 +352,7 @@ class TestExtractionSchema:
         assert connection.execute('SELECT extract_config FROM task_process').fetchone()==(None,)
 
     def test_manifest_contains_explicit_model_and_no_client_secrets(self,connection):
+        """验证 `manifest_contains_explicit_model_and_no_client_secrets` 所代表的行为。 参数包括：`connection`。"""
         task=batch(connection)
         adapter=ModelStub().adapter()
         manifest=adapter.manifest

@@ -25,6 +25,7 @@ class KnowledgeDraft(BaseModel):
     @field_validator("title", "content")
     @classmethod
     def complete_text(cls, value: str) -> str:
+        """执行 `complete_text` 对应的功能并返回处理结果。 参数包括：`value`。"""
         if not value.strip():
             raise ValueError("标题和完整正文不能为空")
         value.encode("utf-8", errors="strict")
@@ -47,10 +48,12 @@ SCHEMA_VERSION = "knowledge-drafts-v1"
 
 
 def canonical_json(value) -> str:
+    """执行 `canonical_json` 对应的功能并返回处理结果。 参数包括：`value`。"""
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
 
 def extraction_manifest(identity: dict) -> dict:
+    """执行 `extraction_manifest` 对应的功能并返回处理结果。 参数包括：`identity`。"""
     if (not isinstance(identity, dict) or set(identity) != {"provider", "name", "version"}
             or any(not isinstance(value, str) or not value.strip() for value in identity.values())):
         raise ExtractionError("必须明确提供模型服务商、名称及版本")
@@ -66,6 +69,7 @@ def extraction_manifest(identity: dict) -> dict:
 
 
 def validate_output(value) -> ExtractionOutput:
+    """执行 `validate_output` 对应的功能并返回处理结果。 参数包括：`value`。"""
     try:
         # 重新验证实例，避免外部修改 items 列表绕过完整结果校验。
         if isinstance(value, ExtractionOutput):
@@ -78,9 +82,11 @@ def validate_output(value) -> ExtractionOutput:
 class _CompleteJsonParser(JsonOutputParser):
     def parse_result(self, result, *, partial: bool = False):
         # JsonOutputParser 默认容忍截断 JSON；成功检查点必须基于完整响应。
+        """执行 `parse_result` 对应的功能并返回处理结果。 参数包括：`result`、`partial`。"""
         if partial:
             raise ValueError("抽取不能发布部分输出")
         def unique_fields(pairs):
+            """执行 `unique_fields` 对应的功能并返回处理结果。 参数包括：`pairs`。"""
             value = {}
             for key, item in pairs:
                 if key in value:
@@ -89,6 +95,7 @@ class _CompleteJsonParser(JsonOutputParser):
             return value
 
         def invalid_constant(value):
+            """执行 `invalid_constant` 对应的功能并返回处理结果。 参数包括：`value`。"""
             raise ValueError("JSON 包含非法常量：" + value)
 
         return json.loads(result[0].text, object_pairs_hook=unique_fields, parse_constant=invalid_constant)
@@ -98,6 +105,7 @@ class LangChainExtractor:
     """Runnable 接收 ChatPromptValue，返回 JSON 文本或 AIMessage；无需新增 provider 依赖。"""
 
     def __init__(self, model: Runnable, *, provider: str, model_name: str, model_version: str):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：`model`、`provider`、`model_name`、`model_version`。"""
         if not isinstance(model, Runnable):
             raise ExtractionError("模型必须是 LangChain Runnable")
         identity = {"provider": provider, "name": model_name, "version": model_version}
@@ -107,9 +115,11 @@ class LangChainExtractor:
 
     @property
     def manifest(self) -> dict:
+        """执行 `manifest` 对应的功能并返回处理结果。 参数包括：无显式参数。"""
         return json.loads(canonical_json(self._manifest))
 
     def invoke(self, content: str) -> ExtractionOutput:
+        """执行 `invoke` 对应的功能并返回处理结果。 参数包括：`content`。"""
         try:
             output = self._chain.invoke({"content": content})
         except Exception as exc:

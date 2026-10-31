@@ -23,9 +23,11 @@ class Alias:
 
 class AliasService:
     def __init__(self, connection: sqlite3.Connection):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：`connection`。"""
         self.connection = connection
 
     def get(self, alias_id: int) -> Alias:
+        """执行 `get` 对应的功能并返回处理结果。 参数包括：`alias_id`。"""
         require_id(alias_id)
         row = self.connection.execute(
             "SELECT id, owner_type, owner_id, name, origin FROM alias WHERE id = ?", (alias_id,)
@@ -35,6 +37,7 @@ class AliasService:
         return Alias(*row)
 
     def list_for(self, owner_type: int, owner_id: int) -> list[Alias]:
+        """执行 `list_for` 对应的功能并返回处理结果。 参数包括：`owner_type`、`owner_id`。"""
         require_owner(self.connection, owner_type, owner_id)
         return [Alias(*row) for row in self.connection.execute(
             "SELECT id, owner_type, owner_id, name, origin FROM alias "
@@ -42,6 +45,7 @@ class AliasService:
         )]
 
     def _find(self, owner_type: int, owner_id: int, name: str) -> Alias | None:
+        """执行 `find` 所属的内部处理步骤。 参数包括：`owner_type`、`owner_id`、`name`。"""
         row = self.connection.execute(
             "SELECT id, owner_type, owner_id, name, origin FROM alias "
             f"WHERE owner_type = ? AND owner_id = ? AND name = ? COLLATE {ALIAS_COLLATION}",
@@ -51,10 +55,12 @@ class AliasService:
 
     @staticmethod
     def _require_confirmed(confirmed: bool) -> None:
+        """执行 `require_confirmed` 所属的内部处理步骤。 参数包括：`confirmed`。"""
         if confirmed is not True:
             raise KnowledgeManagementError("待审别名须保存在 suggestion_payload，确认后才能写入")
 
     def add(self, owner_type: int, owner_id: int, name: str, *, confirmed: bool, origin: int = 1) -> Alias:
+        """执行 `add` 对应的功能并返回处理结果。 参数包括：`owner_type`、`owner_id`、`name`、`confirmed`、`origin`。"""
         self._require_confirmed(confirmed)
         require_enum(origin, (0, 1))
         require_text(name)
@@ -71,6 +77,7 @@ class AliasService:
             return self.get(alias_id)
 
     def rename(self, alias_id: int, name: str, *, confirmed: bool) -> Alias:
+        """执行 `rename` 对应的功能并返回处理结果。 参数包括：`alias_id`、`name`、`confirmed`。"""
         self._require_confirmed(confirmed)
         require_text(name)
         with atomic(self.connection):
@@ -86,6 +93,7 @@ class AliasService:
             return self.get(alias_id)
 
     def delete(self, alias_id: int) -> None:
+        """执行 `delete` 对应的功能并返回处理结果。 参数包括：`alias_id`。"""
         with atomic(self.connection):
             before = self.get(alias_id)
             require_owner(self.connection, before.owner_type, before.owner_id)

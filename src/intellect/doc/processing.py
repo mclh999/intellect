@@ -25,6 +25,7 @@ class DocumentProcessingError(IntellectError):
 
 
 def archive_path(value: str) -> Path:
+    """执行 `archive_path` 对应的功能并返回处理结果。 参数包括：`value`。"""
     if value.startswith("file:"):
         parsed = urlparse(value)
         if parsed.netloc not in {"", "localhost"}:
@@ -36,6 +37,7 @@ def archive_path(value: str) -> Path:
 
 
 def _read_archive(path: Path) -> bytes:
+    """执行 `read_archive` 所属的内部处理步骤。 参数包括：`path`。"""
     try:
         return path.read_bytes()
     except OSError as exc:
@@ -44,12 +46,14 @@ def _read_archive(path: Path) -> bytes:
 
 class DocumentProcessingService:
     def __init__(self, connection: sqlite3.Connection, *, lease: TaskLease | None = None):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：`connection`、`lease`。"""
         self.connection = connection
         self.batches = DocumentBatchService(connection, lease=lease)
 
     def create(
         self, document_id: int, *, chunking: ChunkConfig | None = None, parser_options: dict | None = None,
     ) -> ImportBatch:
+        """执行 `create` 对应的功能并返回处理结果。 参数包括：`document_id`、`chunking`、`parser_options`。"""
         row = self.connection.execute(
             "SELECT storage_url, source_type, file_hash, status FROM source_document WHERE id = ?", (document_id,)
         ).fetchone()
@@ -76,6 +80,7 @@ class DocumentProcessingService:
                                        chunking=chunking, parser_options=snapshot)
 
     def run(self, task_id: int) -> ImportBatch:
+        """执行 `run` 对应的功能并返回处理结果。 参数包括：`task_id`。"""
         batch = self.batches.get(task_id)
         if batch.chunk_count is not None:
             return self.batches.publish(task_id, expected_count=batch.chunk_count)

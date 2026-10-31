@@ -39,6 +39,7 @@ class TaskLease:
     retry_count: int
 
     def __post_init__(self):
+        """实现 `__post_init__` 生命周期钩子，初始化或维护对象状态。 参数包括：无显式参数。"""
         _integer(self.task_id, "id", 1)
         _integer(self.task_type, "task_type")
         _integer(self.retry_count, "retry_count")
@@ -57,6 +58,7 @@ class TaskLease:
             raise TaskOwnershipError("任务执行所有权已失效", task_id=task_id)
 
     def touch(self, connection: sqlite3.Connection, task_id: int, task_type: int) -> None:
+        """执行 `touch` 对应的功能并返回处理结果。 参数包括：`connection`、`task_id`、`task_type`。"""
         self.check(connection, task_id, task_type)
         connection.execute("UPDATE task_process SET update_time=datetime('now') WHERE id=?", (task_id,))
 
@@ -72,6 +74,7 @@ def task_transaction(connection: sqlite3.Connection, lease: TaskLease):
 
 @contextmanager
 def _write_transaction(connection: sqlite3.Connection):
+    """执行 `write_transaction` 所属的内部处理步骤。 参数包括：`connection`。"""
     nested = connection.in_transaction
     name = "task_state_" + uuid4().hex
     connection.execute(f"SAVEPOINT {name}" if nested else "BEGIN IMMEDIATE")
@@ -88,11 +91,13 @@ def _write_transaction(connection: sqlite3.Connection):
 
 
 def _integer(value, name: str, minimum: int = 0) -> None:
+    """执行 `integer` 所属的内部处理步骤。 参数包括：`value`、`name`、`minimum`。"""
     if type(value) is not int or value < minimum:
         raise TaskExecutionError(f"任务字段 {name} 必须为不小于 {minimum} 的整数")
 
 
 def _json_object(value, name: str) -> None:
+    """执行 `json_object` 所属的内部处理步骤。 参数包括：`value`、`name`。"""
     try:
         if not isinstance(value, str) or not isinstance(json.loads(value), dict):
             raise ValueError("不是 JSON 对象")
@@ -102,6 +107,7 @@ def _json_object(value, name: str) -> None:
 
 @contextmanager
 def _read_snapshot(connection: sqlite3.Connection):
+    """执行 `read_snapshot` 所属的内部处理步骤。 参数包括：`connection`。"""
     name = "task_read_" + uuid4().hex
     connection.execute(f"SAVEPOINT {name}")
     try:
@@ -117,9 +123,11 @@ class TaskQueryService:
     """查询不会领取任务、刷新心跳或修改任何任务/业务记录。"""
 
     def __init__(self, connection: sqlite3.Connection):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：`connection`。"""
         self.connection = connection
 
     def get(self, task_id: int) -> TaskRecord:
+        """执行 `get` 对应的功能并返回处理结果。 参数包括：`task_id`。"""
         _integer(task_id, "id", 1)
         with _read_snapshot(self.connection):
             row = self.connection.execute(
@@ -134,6 +142,7 @@ class TaskQueryService:
             return task
 
     def list_pending(self, task_type: int) -> tuple[TaskRecord, ...]:
+        """执行 `list_pending` 对应的功能并返回处理结果。 参数包括：`task_type`。"""
         _integer(task_type, "task_type")
         if task_type not in (0, 1):
             raise TaskExecutionError("任务类型只能为导入或索引同步")
@@ -144,6 +153,7 @@ class TaskQueryService:
             return tuple(self.get(row[0]) for row in rows)
 
     def _validate(self, task: TaskRecord) -> None:
+        """执行 `validate` 所属的内部处理步骤。 参数包括：`task`。"""
         _integer(task.task_type, "task_type")
         _integer(task.status, "status")
         _integer(task.retry_count, "retry_count")
@@ -179,6 +189,7 @@ class TaskQueryService:
 
 class TaskStateService(TaskQueryService):
     def claim(self, task_type: int, *, task_id: int | None = None) -> TaskLease | None:
+        """执行 `claim` 对应的功能并返回处理结果。 参数包括：`task_type`、`task_id`。"""
         _integer(task_type, "task_type")
         if task_type not in (0, 1):
             raise TaskExecutionError("未知任务类型")
@@ -202,10 +213,12 @@ class TaskStateService(TaskQueryService):
             return TaskLease(task.id, task.task_type, task.retry_count)
 
     def heartbeat(self, lease: TaskLease) -> None:
+        """执行 `heartbeat` 对应的功能并返回处理结果。 参数包括：`lease`。"""
         with task_transaction(self.connection, lease):
             pass
 
     def retry(self, task_id: int) -> TaskRecord:
+        """执行 `retry` 对应的功能并返回处理结果。 参数包括：`task_id`。"""
         with _write_transaction(self.connection):
             task = self.get(task_id)
             if task.status != 4:
@@ -217,6 +230,7 @@ class TaskStateService(TaskQueryService):
             return self.get(task_id)
 
     def finish(self, lease: TaskLease) -> TaskRecord:
+        """执行 `finish` 对应的功能并返回处理结果。 参数包括：`lease`。"""
         with _write_transaction(self.connection):
             lease.check(self.connection, lease.task_id, lease.task_type)
             task = self.get(lease.task_id)
@@ -228,6 +242,7 @@ class TaskStateService(TaskQueryService):
             return self.get(task.id)
 
     def _import_status(self, task: TaskRecord) -> int:
+        """执行 `import_status` 所属的内部处理步骤。 参数包括：`task`。"""
         from intellect.doc.hashing import chunk_hash
         from intellect.extract.model import ExtractionError, extraction_manifest
 
@@ -284,9 +299,11 @@ class DatabaseTaskErrorRecorder:
     """实现 TaskErrorRecorder；绑定一次领取，错误与失败状态整体提交。"""
 
     def __init__(self, connection: sqlite3.Connection, lease: TaskLease):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：`connection`、`lease`。"""
         self.connection, self.lease = connection, lease
 
     def record_error(self, task_id: int, error_info: str) -> None:
+        """执行 `record_error` 对应的功能并返回处理结果。 参数包括：`task_id`、`error_info`。"""
         try:
             info = json.loads(error_info)
             required = {"code", "type", "message", "context", "task_id", "occurred_at", "traceback"}

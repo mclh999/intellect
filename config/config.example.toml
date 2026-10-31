@@ -54,6 +54,10 @@ base_url = ""
 [database]
 path = "data/intellect.db"
 
+# ---- 登录：令牌仅保存在当前进程；密码与令牌不写配置文件 ----
+[auth]
+session_ttl_seconds = 3600    # 正整数秒；到期需重新登录，退出进程后会话消失
+
 # ---- 日志（格式统一在 core/logging.py 定义）----
 [logging]
 level = "INFO"                # DEBUG / INFO / WARNING / ERROR / CRITICAL

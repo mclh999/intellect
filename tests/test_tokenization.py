@@ -22,6 +22,7 @@ from intellect.search.tokenization import (
 
 @pytest.fixture
 def connection(tmp_path):
+    """执行 `connection` 对应的功能并返回处理结果。 参数包括：`tmp_path`。"""
     path = tmp_path / "tokenization.db"
     initialize_database(path)
     with closing(connect_database(path)) as database:
@@ -29,6 +30,7 @@ def connection(tmp_path):
 
 
 def add_knowledge(connection, text, status=0):
+    """执行 `add_knowledge` 对应的功能并返回处理结果。 参数包括：`connection`、`text`、`status`。"""
     with connection:
         kid = connection.execute("INSERT INTO knowledge (status) VALUES (?)", (status,)).lastrowid
         vid = connection.execute(
@@ -43,10 +45,12 @@ def add_knowledge(connection, text, status=0):
 class TestSharedTokenization:
     @pytest.mark.parametrize("text", ["原子性与可见性", "ＡＩ AI A I", "Alpha-Beta OR C++", "否定不等于无条件", " \t\n"])
     def test_default_tokens_preserve_existing_jieba_behavior(self, text):
+        """验证 `default_tokens_preserve_existing_jieba_behavior` 所代表的行为。 参数包括：`text`。"""
         reference = jieba.Tokenizer()
         assert tokenize(text) == [word for word in reference.cut(text) if word.strip()]
 
     def test_fields_tokenized_separately_and_stopwords_only_filter_queries(self, tmp_path):
+        """验证 `fields_tokenized_separately_and_stopwords_only_filter_queries` 所代表的行为。 参数包括：`tmp_path`。"""
         path = tmp_path / "stopwords.txt"
         path.write_text("\ufeffAlpha\n的\n", encoding="utf-8")
         tokenizer = TextTokenizer(TokenizationConfig(stopwords_path=str(path)))
@@ -55,6 +59,7 @@ class TestSharedTokenization:
         assert token_text(["A", "I"]) == "A I"
 
     def test_custom_dictionary_used_for_index_and_query(self, tmp_path):
+        """验证 `custom_dictionary_used_for_index_and_query` 所代表的行为。 参数包括：`tmp_path`。"""
         path = tmp_path / "domain.txt"
         path.write_text("智识回溯协议 1000000 n\n", encoding="utf-8")
         tokenizer = TextTokenizer(TokenizationConfig(user_dictionaries=[str(path)]))
@@ -64,6 +69,7 @@ class TestSharedTokenization:
 
 class TestAssetVersions:
     def test_content_versions_do_not_depend_on_file_location(self, tmp_path):
+        """验证 `content_versions_do_not_depend_on_file_location` 所代表的行为。 参数包括：`tmp_path`。"""
         first = tmp_path / "first.txt"
         second = tmp_path / "second.txt"
         data = "智识回溯协议 1000000 n\n".encode("utf-8")
@@ -78,6 +84,7 @@ class TestAssetVersions:
         assert len(a.manifest.base_dictionary_sha256) == 64
 
     def test_file_changes_do_not_mutate_existing_snapshot(self, tmp_path):
+        """验证 `file_changes_do_not_mutate_existing_snapshot` 所代表的行为。 参数包括：`tmp_path`。"""
         dictionary = tmp_path / "domain.txt"
         stops = tmp_path / "stopwords.txt"
         dictionary.write_text("智识回溯协议 1000000 n\n", encoding="utf-8")
@@ -95,6 +102,7 @@ class TestAssetVersions:
         assert after.manifest.asset_id != manifest.asset_id
 
     def test_dictionary_order_is_part_of_asset_version(self, tmp_path):
+        """验证 `dictionary_order_is_part_of_asset_version` 所代表的行为。 参数包括：`tmp_path`。"""
         first, second = tmp_path / "one.txt", tmp_path / "two.txt"
         first.write_text("智识回溯协议 1000000\n", encoding="utf-8")
         second.write_text("智识回溯协议 1000\n", encoding="utf-8")
@@ -104,6 +112,7 @@ class TestAssetVersions:
 
     @pytest.mark.parametrize("data", [b'\xff', "智识回溯协议 0 n\n".encode(), "智识回溯协议 000\n".encode()])
     def test_invalid_dictionary_does_not_change_shared_tokenizer(self, tmp_path, data):
+        """验证 `invalid_dictionary_does_not_change_shared_tokenizer` 所代表的行为。 参数包括：`tmp_path`、`data`。"""
         before = tokenize("智识回溯协议")
         path = tmp_path / "invalid.txt"
         path.write_bytes(data)
@@ -112,6 +121,7 @@ class TestAssetVersions:
         assert tokenize("智识回溯协议") == before
 
     def test_missing_or_invalid_stopwords_fail_explicitly(self, tmp_path):
+        """验证 `missing_or_invalid_stopwords_fail_explicitly` 所代表的行为。 参数包括：`tmp_path`。"""
         path = tmp_path / "missing.txt"
         with pytest.raises(TokenizationError) as caught:
             TextTokenizer(TokenizationConfig(stopwords_path=str(path)))
@@ -123,6 +133,7 @@ class TestAssetVersions:
 
 class TestFtsAssetRebuild:
     def test_rebuild_uses_new_assets_and_preserves_facts(self, connection, tmp_path, monkeypatch):
+        """验证 `rebuild_uses_new_assets_and_preserves_facts` 所代表的行为。 参数包括：`connection`、`tmp_path`、`monkeypatch`。"""
         first = add_knowledge(connection, "智识回溯协议")
         inactive = add_knowledge(connection, "停用证据", status=1)
         categories = CategoryService(connection)
@@ -153,6 +164,7 @@ class TestFtsAssetRebuild:
             reset_tokenizer_cache()
 
     def test_rebuild_failure_restores_entire_old_index(self, connection):
+        """验证 `rebuild_failure_restores_entire_old_index` 所代表的行为。 参数包括：`connection`。"""
         add_knowledge(connection, "保留旧索引")
         with connection:
             connection.execute("INSERT INTO knowledge DEFAULT VALUES")
@@ -162,6 +174,7 @@ class TestFtsAssetRebuild:
         assert connection.execute("SELECT * FROM knowledge_fts ORDER BY rowid").fetchall() == before
 
     def test_rebuild_joins_outer_transaction(self, connection):
+        """验证 `rebuild_joins_outer_transaction` 所代表的行为。 参数包括：`connection`。"""
         first = add_knowledge(connection, "正式内容")
         with connection:
             connection.execute("UPDATE knowledge_fts SET content_tokens = '旧索引' WHERE rowid = ?", (first,))

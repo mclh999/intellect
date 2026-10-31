@@ -49,6 +49,7 @@ class DedupConfig(StrictModel):
 
     @model_validator(mode="after")
     def _check_ordering(self) -> "DedupConfig":
+        """执行 `check_ordering` 所属的内部处理步骤。 参数包括：无显式参数。"""
         if self.gray_zone_threshold >= self.auto_merge_threshold:
             raise ValueError("gray_zone_threshold 必须小于 auto_merge_threshold")
         return self
@@ -66,6 +67,7 @@ class ChunkConfig(StrictModel):
 
     @model_validator(mode="after")
     def _check_overlap(self) -> "ChunkConfig":
+        """执行 `check_overlap` 所属的内部处理步骤。 参数包括：无显式参数。"""
         if self.chunk_overlap >= self.chunk_size:
             raise ValueError("chunk_overlap 必须小于 chunk_size")
         return self
@@ -80,6 +82,7 @@ class DocumentConfig(StrictModel):
     @field_validator("text_encoding")
     @classmethod
     def _text_encoding(cls, value: str) -> str:
+        """执行 `text_encoding` 所属的内部处理步骤。 参数包括：`value`。"""
         try:
             codecs.lookup(value)
             "a".encode(value)
@@ -147,6 +150,12 @@ class LoggingConfig(StrictModel):
     dir: str = Field(default="logs", description="日志目录（不入库）")
 
 
+class AuthConfig(StrictModel):
+    """当前进程登录会话的有效期。"""
+
+    session_ttl_seconds: int = Field(default=3600, gt=0, strict=True)
+
+
 class Settings(StrictModel):
     """全局配置根模型。"""
 
@@ -160,6 +169,7 @@ class Settings(StrictModel):
     embedding: EmbeddingConfig = EmbeddingConfig()
     database: DatabaseConfig = DatabaseConfig()
     logging: LoggingConfig = LoggingConfig()
+    auth: AuthConfig = AuthConfig()
 
 
 def load_settings(config_path: str | Path | None = None) -> Settings:

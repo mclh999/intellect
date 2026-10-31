@@ -34,6 +34,7 @@ def or_query(terms: Sequence[str]) -> str:
 @contextmanager
 def _read_snapshot(connection: sqlite3.Connection):
     # SAVEPOINT 在独立查询时打开读事务，在调用方事务内则保留外层所有权。
+    """执行 `read_snapshot` 所属的内部处理步骤。 参数包括：`connection`。"""
     name = "fts_read_" + uuid4().hex
     connection.execute(f"SAVEPOINT {name}")
     try:
@@ -53,12 +54,14 @@ class FtsSearchService:
         tokenizer: TextTokenizer | None = None,
         concept_extractor: Callable[[str], Sequence[str]] | None = None,
     ):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：`connection`、`config`、`tokenizer`、`concept_extractor`。"""
         self.connection = connection
         self.config = (config if config is not None else get_settings().fts).model_copy(deep=True)
         self.tokenizer = tokenizer if tokenizer is not None else get_tokenizer()
         self.concept_extractor = concept_extractor
 
     def _queries(self, question: str) -> list[str]:
+        """执行 `queries` 所属的内部处理步骤。 参数包括：`question`。"""
         if not isinstance(question, str):
             raise FtsSearchError("问题必须为文本")
         terms = self.tokenizer.query_terms(question)
@@ -80,6 +83,7 @@ class FtsSearchService:
 
     def search(self, question: str) -> list[FtsHit]:
         # 模型/抽取器调用在读事务之前完成，避免在模型等待期间持有数据库快照。
+        """执行 `search` 对应的功能并返回处理结果。 参数包括：`question`。"""
         queries = self._queries(question)
         if not queries:
             return []

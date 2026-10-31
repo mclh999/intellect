@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 
 import intellect
 from intellect.core.config import get_settings
@@ -14,10 +15,16 @@ from intellect.core.logging import setup_logging
 logger = logging.getLogger(__name__)
 
 
-def main() -> int:
-    """空入口：加载配置、初始化统一日志，打印就绪信息，返回退出码。"""
+def main(argv: list[str] | None = None) -> int:
+    """装配配置和日志；有命令参数时进入登录及受保护业务入口，否则展示就绪信息。"""
     settings = get_settings()
     setup_logging(settings)
+
+    arguments = sys.argv[1:] if argv is None else argv
+    if arguments:
+        from intellect.auth.cli import run
+
+        return run(arguments)
 
     print(f"intellect {intellect.__version__} —— Agent 知识库系统")
     print("配置中心就绪：")

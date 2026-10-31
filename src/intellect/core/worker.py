@@ -24,9 +24,11 @@ class TaskContext:
     lease: TaskLease
 
     def heartbeat(self) -> None:
+        """执行 `heartbeat` 对应的功能并返回处理结果。 参数包括：无显式参数。"""
         TaskStateService(self.connection).heartbeat(self.lease)
 
     def transaction(self):
+        """执行 `transaction` 对应的功能并返回处理结果。 参数包括：无显式参数。"""
         return task_transaction(self.connection, self.lease)
 
 
@@ -34,11 +36,13 @@ class ImportTaskHandler:
     """接入解析/抽取；匹配审核由后续服务注入，未判定的候选不能虚假完成。"""
 
     def __init__(self, extractor: LangChainExtractor, *, match_and_review: Callable[[TaskContext], None] | None = None):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：`extractor`、`match_and_review`。"""
         if not isinstance(extractor, LangChainExtractor) or (match_and_review is not None and not callable(match_and_review)):
             raise TaskExecutionError("必须提供抽取适配器和可调用的匹配审核步骤")
         self.extractor, self.match_and_review = extractor, match_and_review
 
     def __call__(self, context: TaskContext) -> None:
+        """实现 `__call__` 生命周期钩子，初始化或维护对象状态。 参数包括：`context`。"""
         if context.lease.task_type != 0:
             raise TaskExecutionError("导入处理器不能处理同步任务")
         context.heartbeat()
@@ -52,6 +56,7 @@ class ImportTaskHandler:
 
 class TaskWorker:
     def __init__(self, connection: sqlite3.Connection, handlers: Mapping[int, Callable[[TaskContext], None]]):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：`connection`、`handlers`。"""
         self.connection = connection
         self.handlers = dict(handlers)
         if any(type(kind) is not int or kind not in (0, 1) or not callable(handler)
@@ -60,6 +65,7 @@ class TaskWorker:
         self.states = TaskStateService(connection)
 
     def run_once(self, task_type: int = 0) -> TaskRecord | None:
+        """执行 `run_once` 对应的功能并返回处理结果。 参数包括：`task_type`。"""
         if self.connection.in_transaction:
             raise TaskExecutionError("worker 不能在外层事务内轮询或执行模型")
         if type(task_type) is not int or task_type not in (0, 1):
@@ -89,6 +95,7 @@ class TaskWorker:
             return self.states.get(lease.task_id)
 
     def run_pending(self, task_type: int = 0, *, limit: int) -> tuple[TaskRecord, ...]:
+        """执行 `run_pending` 对应的功能并返回处理结果。 参数包括：`task_type`、`limit`。"""
         if type(limit) is not int or limit <= 0:
             raise TaskExecutionError("轮询次数必须为正整数")
         results = []

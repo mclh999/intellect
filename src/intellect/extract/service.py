@@ -50,6 +50,7 @@ class ExtractionResult:
 
 class ExtractionService:
     def __init__(self, connection: sqlite3.Connection, extractor: LangChainExtractor, *, lease: TaskLease | None = None):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：`connection`、`extractor`、`lease`。"""
         self.connection = connection
         self.lease = lease
         if not isinstance(extractor, LangChainExtractor):
@@ -63,6 +64,7 @@ class ExtractionService:
         self.batches = DocumentBatchService(connection, lease=lease)
 
     def _task(self, task_id: int):
+        """执行 `task` 所属的内部处理步骤。 参数包括：`task_id`。"""
         if self.lease is not None:
             self.lease.touch(self.connection, task_id, 0)
         batch = self.batches.get(task_id)
@@ -108,6 +110,7 @@ class ExtractionService:
                                          batch.parse_config, batch.chunk_count, config, *row) for row in rows)
 
     def _validate_source(self, source: ExtractionInput) -> None:
+        """执行 `validate_source` 所属的内部处理步骤。 参数包括：`source`。"""
         batch, config = self._task(source.task_id)
         current = (batch.source_document_id, batch.chunk_batch, batch.parse_config, batch.chunk_count, config)
         expected = (source.document_id, source.chunk_batch, source.parse_config, source.chunk_count, source.extract_config)
@@ -123,6 +126,7 @@ class ExtractionService:
             raise ExtractionError("任务或来源切片已变化，不能提交或复用旧抽取结果")
 
     def _existing(self, source: ExtractionInput) -> ExtractionResult | None:
+        """执行 `existing` 所属的内部处理步骤。 参数包括：`source`。"""
         checkpoint = self.connection.execute(
             "SELECT candidate_count FROM extraction_result WHERE task_process_id=? AND chunk_id=?",
             (source.task_id, source.chunk_id),
@@ -171,6 +175,7 @@ class ExtractionService:
         return result
 
     def run(self, task_id: int) -> tuple[ExtractionResult, ...]:
+        """执行 `run` 对应的功能并返回处理结果。 参数包括：`task_id`。"""
         results = []
         for source in self.prepare(task_id):
             with _atomic(self.connection):

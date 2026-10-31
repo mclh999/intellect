@@ -25,16 +25,19 @@ class TokenCountError(IntellectError):
 
 class _FixedTokenizer(jieba.Tokenizer):
     def __init__(self, dictionary: bytes):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：`dictionary`。"""
         super().__init__()
         self._dictionary = dictionary
         self.cache_file = "intellect-count-" + _EXPECTED["dictionary_sha256"] + ".cache"
 
     def get_dict_file(self):
+        """执行 `get_dict_file` 对应的功能并返回处理结果。 参数包括：无显式参数。"""
         return io.BytesIO(self._dictionary)
 
 
 class ChunkTokenCounter:
     def __init__(self):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：无显式参数。"""
         try:
             resource = files("intellect.doc").joinpath("assets")
             metadata = json.loads(resource.joinpath("token_counter.json").read_text(encoding="utf-8"))
@@ -48,9 +51,11 @@ class ChunkTokenCounter:
 
     @property
     def manifest(self) -> dict:
+        """执行 `manifest` 对应的功能并返回处理结果。 参数包括：无显式参数。"""
         return dict(_EXPECTED)
 
     def count(self, text: str) -> int:
+        """执行 `count` 对应的功能并返回处理结果。 参数包括：`text`。"""
         if not isinstance(text, str):
             raise TokenCountError("统计输入必须为文本")
         return sum(not token.isspace() for token in self._tokenizer.cut(text, cut_all=False, HMM=False))
@@ -58,4 +63,5 @@ class ChunkTokenCounter:
 
 @lru_cache(maxsize=1)
 def get_counter() -> ChunkTokenCounter:
+    """执行 `get_counter` 对应的功能并返回处理结果。 参数包括：无显式参数。"""
     return ChunkTokenCounter()

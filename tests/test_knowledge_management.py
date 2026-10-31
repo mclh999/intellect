@@ -20,6 +20,7 @@ from intellect.search.tokenization import tokenize
 
 @pytest.fixture
 def database_path(tmp_path):
+    """执行 `database_path` 对应的功能并返回处理结果。 参数包括：`tmp_path`。"""
     path = tmp_path / "management.db"
     initialize_database(path)
     return path
@@ -27,21 +28,25 @@ def database_path(tmp_path):
 
 @pytest.fixture
 def connection(database_path):
+    """执行 `connection` 对应的功能并返回处理结果。 参数包括：`database_path`。"""
     with closing(connect_database(database_path)) as database:
         yield database
 
 
 @pytest.fixture
 def categories(connection):
+    """执行 `categories` 对应的功能并返回处理结果。 参数包括：`connection`。"""
     return CategoryService(connection)
 
 
 @pytest.fixture
 def aliases(connection):
+    """执行 `aliases` 对应的功能并返回处理结果。 参数包括：`connection`。"""
     return AliasService(connection)
 
 
 def knowledge(database, *, status=0, title="事务隔离", content="原子性与可见性需要完整上下文"):
+    """执行 `knowledge` 对应的功能并返回处理结果。 参数包括：`database`、`status`、`title`、`content`。"""
     with database:
         model_id = database.execute(
             "INSERT INTO embedding_model (model_name, dimension) VALUES (?, 1024)",
@@ -61,6 +66,7 @@ def knowledge(database, *, status=0, title="事务隔离", content="原子性与
 
 
 def fts_row(database, knowledge_id):
+    """执行 `fts_row` 对应的功能并返回处理结果。 参数包括：`database`、`knowledge_id`。"""
     return database.execute(
         "SELECT rowid, title_tokens, content_tokens, alias_tokens, category_tokens, knowledge_id, version_id "
         "FROM knowledge_fts WHERE rowid = ?", (knowledge_id,),
@@ -68,6 +74,7 @@ def fts_row(database, knowledge_id):
 
 
 def matches(database, text):
+    """执行 `matches` 对应的功能并返回处理结果。 参数包括：`database`、`text`。"""
     query = " OR ".join('"' + word.replace('"', '""') + '"' for word in tokenize(text))
     return [row[0] for row in database.execute(
         "SELECT knowledge_id FROM knowledge_fts WHERE knowledge_fts MATCH ? ORDER BY rowid", (query,)
@@ -76,6 +83,7 @@ def matches(database, text):
 
 class TestCategoryTree:
     def test_initial_tree_created_from_explicit_input(self, categories):
+        """验证 `initial_tree_created_from_explicit_input` 所代表的行为。 参数包括：`categories`。"""
         created = categories.create_tree((
             CategorySeed("计算机科学", (CategorySeed("数据库"), CategorySeed("网络"))),
             CategorySeed("其他领域"),
@@ -86,11 +94,13 @@ class TestCategoryTree:
 
     @pytest.mark.parametrize("bad_seed", [None, "错误节点", CategorySeed(7)])
     def test_initial_tree_partial_failure_rolls_back(self, categories, bad_seed):
+        """验证 `initial_tree_partial_failure_rolls_back` 所代表的行为。 参数包括：`categories`、`bad_seed`。"""
         with pytest.raises(KnowledgeManagementError):
             categories.create_tree((CategorySeed("已写根", (CategorySeed("已写子"),)), bad_seed))
         assert categories.list_all() == []
 
     def test_self_and_descendant_parent_rejected(self, categories, connection):
+        """验证 `self_and_descendant_parent_rejected` 所代表的行为。 参数包括：`categories`、`connection`。"""
         root, child, leaf = categories.create_tree((CategorySeed("根", (CategorySeed("子", (CategorySeed("叶"),)),)),))
         for parent_id in (root.id, child.id, leaf.id):
             with pytest.raises(KnowledgeManagementError, match="循环"):
@@ -99,6 +109,7 @@ class TestCategoryTree:
         assert connection.execute("SELECT count(*) FROM change_log").fetchone()[0] == 0
 
     def test_missing_parent_and_corrupted_parent_chain_rejected(self, categories, connection):
+        """验证 `missing_parent_and_corrupted_parent_chain_rejected` 所代表的行为。 参数包括：`categories`、`connection`。"""
         with pytest.raises(KnowledgeManagementError, match="不存在"):
             categories.create("孤立分类", parent_id=999)
         root, child = categories.create_tree((CategorySeed("根", (CategorySeed("子"),)),))
@@ -109,6 +120,7 @@ class TestCategoryTree:
         assert len(categories.list_all()) == 2
 
     def test_rename_and_move_log_full_snapshots(self, categories, connection):
+        """验证 `rename_and_move_log_full_snapshots` 所代表的行为。 参数包括：`categories`、`connection`。"""
         root, other, child = categories.create_tree((CategorySeed("根"), CategorySeed("另一根", (CategorySeed("旧名称"),))))
         renamed = categories.rename(child.id, "新名称", reason="规范名称", operator="system")
         moved = categories.move(child.id, root.id, reason="调整层级", operator="system")
@@ -127,6 +139,7 @@ class TestCategoryTree:
         assert json.loads(rows[1][3])["parent_id"] == root.id
 
     def test_noop_does_not_log(self, categories, connection):
+        """验证 `noop_does_not_log` 所代表的行为。 参数包括：`categories`、`connection`。"""
         root = categories.create("根")
         categories.rename(root.id, "根", reason="不变")
         categories.move(root.id, None, reason="不变")
@@ -135,6 +148,7 @@ class TestCategoryTree:
 
     @pytest.mark.parametrize("operation", ["rename", "move", "set_status", "delete"])
     def test_category_changes_require_reason(self, categories, operation):
+        """验证 `category_changes_require_reason` 所代表的行为。 参数包括：`categories`、`operation`。"""
         root = categories.create("根")
         arguments = {"rename": ("新名",), "move": (None,), "set_status": (1,), "delete": ()}
         with pytest.raises(KnowledgeManagementError, match="原因"):
@@ -144,6 +158,7 @@ class TestCategoryTree:
 
 class TestCategoryFts:
     def test_multiple_direct_categories_survive_one_disabled(self, categories, aliases, connection):
+        """验证 `multiple_direct_categories_survive_one_disabled` 所代表的行为。 参数包括：`categories`、`aliases`、`connection`。"""
         first, second = categories.create_tree((CategorySeed("FirstCategory"), CategorySeed("SecondCategory")))
         knowledge_id = knowledge(connection)
         for category in (first, second):
@@ -155,6 +170,7 @@ class TestCategoryFts:
         assert fts_row(connection, knowledge_id)[4] == "SecondCategory"
 
     def test_enabled_direct_category_names_and_aliases_only(self, categories, aliases, connection):
+        """验证 `enabled_direct_category_names_and_aliases_only` 所代表的行为。 参数包括：`categories`、`aliases`、`connection`。"""
         root, child = categories.create_tree((CategorySeed("AncestorOnly", (CategorySeed("DirectOnly"),)),))
         aliases.add(1, root.id, "AncestorAlias", confirmed=True)
         aliases.add(1, child.id, "DirectAlias", confirmed=True)
@@ -169,6 +185,7 @@ class TestCategoryFts:
         assert matches(connection, "DisabledOnly") == []
 
     def test_rename_updates_only_directly_linked_knowledge(self, categories, connection, monkeypatch):
+        """验证 `rename_updates_only_directly_linked_knowledge` 所代表的行为。 参数包括：`categories`、`connection`、`monkeypatch`。"""
         parent, child = categories.create_tree((CategorySeed("OldParent", (CategorySeed("Child"),)),))
         direct = knowledge(connection)
         indirect = knowledge(connection)
@@ -179,6 +196,7 @@ class TestCategoryFts:
         real_refresh = category_module.refresh_owner
 
         def spy(database, owner_type, owner_id):
+            """执行 `spy` 对应的功能并返回处理结果。 参数包括：`database`、`owner_type`、`owner_id`。"""
             refreshed.append((owner_type, owner_id))
             return real_refresh(database, owner_type, owner_id)
 
@@ -190,12 +208,14 @@ class TestCategoryFts:
         assert refreshed == [(1, parent.id)]
 
     def test_move_does_not_refresh_fts(self, categories, connection, monkeypatch):
+        """验证 `move_does_not_refresh_fts` 所代表的行为。 参数包括：`categories`、`connection`、`monkeypatch`。"""
         root, other, child = categories.create_tree((CategorySeed("根"), CategorySeed("其他"), CategorySeed("子")))
         knowledge_id = knowledge(connection)
         categories.attach_knowledge(child.id, knowledge_id)
         before = fts_row(connection, knowledge_id)
 
         def unexpected_refresh(*args):
+            """执行 `unexpected_refresh` 对应的功能并返回处理结果。 参数包括：`*args`。"""
             raise AssertionError("仅改变父节点不应重建直接分类文本")
 
         monkeypatch.setattr(category_module, "refresh_owner", unexpected_refresh)
@@ -204,6 +224,7 @@ class TestCategoryFts:
         assert fts_row(connection, knowledge_id) == before
 
     def test_single_node_disable_keeps_descendants_and_knowledge(self, categories, aliases, connection):
+        """验证 `single_node_disable_keeps_descendants_and_knowledge` 所代表的行为。 参数包括：`categories`、`aliases`、`connection`。"""
         parent, child = categories.create_tree((CategorySeed("ParentToken", (CategorySeed("ChildToken"),)),))
         aliases.add(1, parent.id, "ParentAlias", confirmed=True)
         direct = knowledge(connection)
@@ -228,6 +249,7 @@ class TestCategoryFts:
         assert matches(connection, "WhileDisabled") == [direct]
 
     def test_attach_detach_idempotent_and_validated(self, categories, connection):
+        """验证 `attach_detach_idempotent_and_validated` 所代表的行为。 参数包括：`categories`、`connection`。"""
         category = categories.create("AttachToken")
         knowledge_id = knowledge(connection)
         assert categories.attach_knowledge(category.id, knowledge_id) is True
@@ -244,6 +266,7 @@ class TestCategoryFts:
 
 class TestCategoryDeletion:
     def test_even_disabled_children_block_deletion(self, categories):
+        """验证 `even_disabled_children_block_deletion` 所代表的行为。 参数包括：`categories`。"""
         parent, child = categories.create_tree((CategorySeed("父", (CategorySeed("子"),)),))
         categories.set_status(child.id, 1, reason="停用子")
         with pytest.raises(KnowledgeManagementError, match="子节点"):
@@ -251,6 +274,7 @@ class TestCategoryDeletion:
         assert categories.get(parent.id) == parent
 
     def test_even_inactive_knowledge_association_blocks_deletion(self, categories, connection):
+        """验证 `even_inactive_knowledge_association_blocks_deletion` 所代表的行为。 参数包括：`categories`、`connection`。"""
         category = categories.create("分类")
         knowledge_id = knowledge(connection, status=1)
         categories.attach_knowledge(category.id, knowledge_id)
@@ -259,6 +283,7 @@ class TestCategoryDeletion:
         assert categories.get(category.id) == category
 
     def test_delete_leaf_cleans_own_aliases_and_keeps_log(self, categories, aliases, connection):
+        """验证 `delete_leaf_cleans_own_aliases_and_keeps_log` 所代表的行为。 参数包括：`categories`、`aliases`、`connection`。"""
         category = categories.create("可删除")
         other = categories.create("保留分类")
         removed_alias = aliases.add(1, category.id, "删除别名", confirmed=True)
@@ -278,6 +303,7 @@ class TestCategoryDeletion:
 
 class TestConfirmedAliases:
     def test_unconfirmed_add_and_rename_do_not_enter_formal_table(self, categories, aliases, connection):
+        """验证 `unconfirmed_add_and_rename_do_not_enter_formal_table` 所代表的行为。 参数包括：`categories`、`aliases`、`connection`。"""
         owner = categories.create("分类")
         with pytest.raises(KnowledgeManagementError, match="suggestion_payload"):
             aliases.add(1, owner.id, "待审", confirmed=False, origin=0)
@@ -287,6 +313,7 @@ class TestConfirmedAliases:
         assert aliases.list_for(1, owner.id) == [existing]
 
     def test_equivalent_add_reuses_record_across_origin(self, aliases, connection):
+        """验证 `equivalent_add_reuses_record_across_origin` 所代表的行为。 参数包括：`aliases`、`connection`。"""
         knowledge_id = knowledge(connection)
         original = aliases.add(0, knowledge_id, "AI", confirmed=True, origin=0)
         for equivalent in ("ai", "A I", " AI", "AI "):
@@ -297,6 +324,7 @@ class TestConfirmedAliases:
 
     @pytest.mark.parametrize("name", ["A  I", " A I", "A I ", "A\tI", "A\nI", "A\u3000I", "ＡＩ"])
     def test_non_equivalent_names_remain_distinct(self, categories, aliases, name):
+        """验证 `non_equivalent_names_remain_distinct` 所代表的行为。 参数包括：`categories`、`aliases`、`name`。"""
         owner = categories.create("分类")
         first = aliases.add(1, owner.id, "AI", confirmed=True)
         other = aliases.add(1, owner.id, name, confirmed=True)
@@ -304,6 +332,7 @@ class TestConfirmedAliases:
         assert other.name == name
 
     def test_same_name_on_other_objects_is_allowed(self, categories, aliases, connection):
+        """验证 `same_name_on_other_objects_is_allowed` 所代表的行为。 参数包括：`categories`、`aliases`、`connection`。"""
         first, second = categories.create_tree((CategorySeed("一"), CategorySeed("二")))
         knowledge_id = knowledge(connection)
         records = [aliases.add(owner_type, owner_id, "AI", confirmed=True) for owner_type, owner_id in (
@@ -312,6 +341,7 @@ class TestConfirmedAliases:
         assert len({row.id for row in records}) == 3
 
     def test_rename_conflict_keeps_both_aliases_and_fts(self, aliases, connection):
+        """验证 `rename_conflict_keeps_both_aliases_and_fts` 所代表的行为。 参数包括：`aliases`、`connection`。"""
         knowledge_id = knowledge(connection)
         first = aliases.add(0, knowledge_id, "AI", confirmed=True)
         second = aliases.add(0, knowledge_id, "ML", confirmed=True)
@@ -322,6 +352,7 @@ class TestConfirmedAliases:
         assert fts_row(connection, knowledge_id) == before
 
     def test_category_alias_add_rename_delete_updates_direct_fts(self, categories, aliases, connection):
+        """验证 `category_alias_add_rename_delete_updates_direct_fts` 所代表的行为。 参数包括：`categories`、`aliases`、`connection`。"""
         category = categories.create("分类")
         knowledge_id = knowledge(connection)
         categories.attach_knowledge(category.id, knowledge_id)
@@ -335,6 +366,7 @@ class TestConfirmedAliases:
         assert matches(connection, "NewAlias") == []
 
     def test_knowledge_alias_changes_preserve_versions_sources_and_index_markers(self, aliases, connection):
+        """验证 `knowledge_alias_changes_preserve_versions_sources_and_index_markers` 所代表的行为。 参数包括：`aliases`、`connection`。"""
         knowledge_id = knowledge(connection)
         with connection:
             doc = connection.execute("INSERT INTO source_document (title, storage_url, content_hash) VALUES ('文档', 'file', 'hash')").lastrowid
@@ -356,16 +388,19 @@ class TestConfirmedAliases:
 
     @pytest.mark.parametrize("owner_type,owner_id,origin", [(2, 1, 0), (False, 1, 0), (0, 999, 0), (1, 999, 0), (0, -1, 0), (0, 1, 2)])
     def test_invalid_polymorphic_owner_or_origin_rejected(self, aliases, connection, owner_type, owner_id, origin):
+        """验证 `invalid_polymorphic_owner_or_origin_rejected` 所代表的行为。 参数包括：`aliases`、`connection`、`owner_type`、`owner_id`、`origin`。"""
         with pytest.raises(KnowledgeManagementError):
             aliases.add(owner_type, owner_id, "无效", confirmed=True, origin=origin)
         assert connection.execute("SELECT count(*) FROM alias").fetchone()[0] == 0
 
     def test_alias_on_inactive_knowledge_does_not_resurrect_fts(self, aliases, connection):
+        """验证 `alias_on_inactive_knowledge_does_not_resurrect_fts` 所代表的行为。 参数包括：`aliases`、`connection`。"""
         knowledge_id = knowledge(connection, status=1)
         aliases.add(0, knowledge_id, "InactiveAlias", confirmed=True)
         assert fts_row(connection, knowledge_id) is None
 
     def test_current_version_from_other_knowledge_rejected(self, aliases, connection):
+        """验证 `current_version_from_other_knowledge_rejected` 所代表的行为。 参数包括：`aliases`、`connection`。"""
         first = knowledge(connection)
         second = knowledge(connection)
         with connection:
@@ -380,6 +415,7 @@ class TestConfirmedAliases:
 
 class TestAtomicManagement:
     def test_partial_multi_knowledge_refresh_failure_rolls_back_all(self, categories, connection, monkeypatch):
+        """验证 `partial_multi_knowledge_refresh_failure_rolls_back_all` 所代表的行为。 参数包括：`categories`、`connection`、`monkeypatch`。"""
         category = categories.create("OriginalCategory")
         first, second = knowledge(connection), knowledge(connection)
         for knowledge_id in (first, second):
@@ -388,6 +424,7 @@ class TestAtomicManagement:
         real_refresh = fts_module.refresh_knowledge
 
         def fail_second(database, knowledge_id):
+            """执行 `fail_second` 对应的功能并返回处理结果。 参数包括：`database`、`knowledge_id`。"""
             if knowledge_id == second:
                 raise RuntimeError("第二条知识刷新失败")
             real_refresh(database, knowledge_id)
@@ -400,6 +437,7 @@ class TestAtomicManagement:
         assert connection.execute("SELECT count(*) FROM change_log").fetchone()[0] == 0
 
     def test_outer_rollback_includes_categories_aliases_fts_and_logs(self, categories, aliases, connection, database_path):
+        """验证 `outer_rollback_includes_categories_aliases_fts_and_logs` 所代表的行为。 参数包括：`categories`、`aliases`、`connection`、`database_path`。"""
         knowledge_id = knowledge(connection)
         before_fts = fts_row(connection, knowledge_id)
         connection.execute("BEGIN IMMEDIATE")
@@ -417,12 +455,14 @@ class TestAtomicManagement:
         assert fts_row(connection, knowledge_id) == before_fts
 
     def test_nested_failure_rolls_back_savepoint_preserving_outer_work(self, categories, aliases, connection, monkeypatch):
+        """验证 `nested_failure_rolls_back_savepoint_preserving_outer_work` 所代表的行为。 参数包括：`categories`、`aliases`、`connection`、`monkeypatch`。"""
         knowledge_id = knowledge(connection)
         connection.execute("BEGIN IMMEDIATE")
         root = categories.create("保留外层")
         real_refresh = alias_module.refresh_owner
 
         def fail_after_fts(*args):
+            """执行 `fail_after_fts` 对应的功能并返回处理结果。 参数包括：`*args`。"""
             real_refresh(*args)
             raise RuntimeError("模拟 FTS 后失败")
 
@@ -436,6 +476,7 @@ class TestAtomicManagement:
         connection.commit()
 
     def test_fts_failure_rolls_back_category_change(self, categories, connection, monkeypatch):
+        """验证 `fts_failure_rolls_back_category_change` 所代表的行为。 参数包括：`categories`、`connection`、`monkeypatch`。"""
         category = categories.create("OriginalCategory")
         knowledge_id = knowledge(connection)
         categories.attach_knowledge(category.id, knowledge_id)
@@ -443,6 +484,7 @@ class TestAtomicManagement:
         real_refresh = category_module.refresh_owner
 
         def fail_after_fts(*args):
+            """执行 `fail_after_fts` 对应的功能并返回处理结果。 参数包括：`*args`。"""
             real_refresh(*args)
             raise RuntimeError("模拟刷新中途失败")
 
@@ -454,10 +496,12 @@ class TestAtomicManagement:
         assert connection.execute("SELECT count(*) FROM change_log").fetchone()[0] == 0
 
     def test_deletion_log_failure_rolls_back_category_and_alias(self, categories, aliases, connection, monkeypatch):
+        """验证 `deletion_log_failure_rolls_back_category_and_alias` 所代表的行为。 参数包括：`categories`、`aliases`、`connection`、`monkeypatch`。"""
         category = categories.create("保留")
         alias = aliases.add(1, category.id, "保留别名", confirmed=True)
 
         def fail_log(*args):
+            """执行 `fail_log` 对应的功能并返回处理结果。 参数包括：`*args`。"""
             raise RuntimeError("日志失败")
 
         monkeypatch.setattr(category_module, "log_category_change", fail_log)

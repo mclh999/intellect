@@ -12,11 +12,13 @@ from intellect.core.logging import LOG_FORMAT, setup_logging
 
 @pytest.fixture(autouse=True)
 def _reset_after_test():
+    """执行 `reset_after_test` 所属的内部处理步骤。 参数包括：无显式参数。"""
     yield
     setup_logging(Settings(), force=True)
 
 
 def test_setup_idempotent(tmp_path):
+    """验证 `setup_idempotent` 所代表的行为。 参数包括：`tmp_path`。"""
     settings = Settings()
     settings.logging.dir = str(tmp_path / "logs")
     setup_logging(settings, force=True)
@@ -26,6 +28,7 @@ def test_setup_idempotent(tmp_path):
 
 
 def test_reconfigure_closes_previous_file(tmp_path):
+    """验证 `reconfigure_closes_previous_file` 所代表的行为。 参数包括：`tmp_path`。"""
     settings = Settings()
     settings.logging.dir = str(tmp_path / "logs")
     setup_logging(settings, force=True)
@@ -36,6 +39,7 @@ def test_reconfigure_closes_previous_file(tmp_path):
 
 
 def test_format_matches_baseline():
+    """验证 `format_matches_baseline` 所代表的行为。 参数包括：无显式参数。"""
     record = logging.LogRecord(
         name="intellect.review.worker",
         level=logging.INFO,

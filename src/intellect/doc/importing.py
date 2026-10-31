@@ -38,6 +38,7 @@ class RegisteredImport:
 
 class DocumentImportService:
     def __init__(self, connection: sqlite3.Connection):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：`connection`。"""
         self.connection = connection
         self.processing = DocumentProcessingService(connection)
 
@@ -46,6 +47,7 @@ class DocumentImportService:
         confirmed_duplicate: bool = False, parser_options: dict | None = None,
         chunking: ChunkConfig | None = None, uploader: str | None = None,
     ) -> RegisteredImport:
+        """执行 `register` 对应的功能并返回处理结果。 参数包括：`archive`、`title`、`kind`、`confirmed_duplicate`、`parser_options`、`chunking`、`uploader`。"""
         if not isinstance(title, str) or not title.strip():
             raise DocumentImportError("必须提供文档标题")
         if type(confirmed_duplicate) is not bool:

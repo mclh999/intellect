@@ -17,17 +17,20 @@ def alias_comparison_key(name: str) -> str:
 
 
 def _compare_aliases(left: str, right: str) -> int:
+    """执行 `compare_aliases` 所属的内部处理步骤。 参数包括：`left`、`right`。"""
     left_key = alias_comparison_key(left)
     right_key = alias_comparison_key(right)
     return (left_key > right_key) - (left_key < right_key)
 
 
 def _database_path(path: str | Path | None) -> Path:
+    """执行 `database_path` 所属的内部处理步骤。 参数包括：`path`。"""
     return Path(get_settings().database.path if path is None else path).resolve()
 
 
 def _open_connection(path: Path, *, create: bool) -> sqlite3.Connection:
     # URI mode=rw 防止普通连接因路径拼写错误创建空事实库。
+    """执行 `open_connection` 所属的内部处理步骤。 参数包括：`path`、`create`。"""
     mode = "rwc" if create else "rw"
     connection = sqlite3.connect(f"{path.as_uri()}?mode={mode}", uri=True)
     try:

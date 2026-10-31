@@ -26,6 +26,7 @@ from intellect.search.tokenization import TextTokenizer
 
 
 def pdf_bytes(texts=("First page", "Second page"), *, encrypted=False, image=False):
+    """执行 `pdf_bytes` 对应的功能并返回处理结果。 参数包括：`texts`、`encrypted`、`image`。"""
     writer = PdfWriter()
     for text in texts:
         page = writer.add_blank_page(width=300, height=300)
@@ -52,6 +53,7 @@ def pdf_bytes(texts=("First page", "Second page"), *, encrypted=False, image=Fal
 
 
 def docx_bytes():
+    """执行 `docx_bytes` 对应的功能并返回处理结果。 参数包括：无显式参数。"""
     document = Document()
     paragraph = document.add_paragraph("第一段\t不可以")
     paragraph.add_run().add_break()
@@ -69,6 +71,7 @@ def docx_bytes():
 
 @pytest.fixture
 def connection(tmp_path):
+    """执行 `connection` 对应的功能并返回处理结果。 参数包括：`tmp_path`。"""
     path = tmp_path / 'parsing.db'
     initialize_database(path)
     with closing(connect_database(path)) as database:
@@ -76,6 +79,7 @@ def connection(tmp_path):
 
 
 def registered(connection, tmp_path, data=b'Alpha Beta Gamma Delta Epsilon', kind='TXT'):
+    """执行 `registered` 对应的功能并返回处理结果。 参数包括：`connection`、`tmp_path`、`data`、`kind`。"""
     path = tmp_path / ('archive.' + {'TXT':'txt','PDF':'pdf','DOCX':'docx','WEB':'html'}[kind])
     path.write_bytes(data)
     content = inspect_bytes(data, kind)
@@ -91,6 +95,7 @@ def registered(connection, tmp_path, data=b'Alpha Beta Gamma Delta Epsilon', kin
 class TestDocumentHashes:
     @pytest.mark.parametrize('function,input_value',[(file_hash,b'abc'),(document_hash,'abc')])
     def test_protocol_manifest_mismatch_fails_closed(self,tmp_path,monkeypatch,function,input_value):
+        """验证 `protocol_manifest_mismatch_fails_closed` 所代表的行为。 参数包括：`tmp_path`、`monkeypatch`、`function`、`input_value`。"""
         (tmp_path/'hash_protocols.json').write_text('{}',encoding='utf-8')
         hashing._document_prefix.cache_clear()
         monkeypatch.setattr(hashing,'files',lambda package:tmp_path)
@@ -101,6 +106,7 @@ class TestDocumentHashes:
             hashing._document_prefix.cache_clear()
 
     def test_fixed_digest_and_only_document_newline_normalization(self):
+        """验证 `fixed_digest_and_only_document_newline_normalization` 所代表的行为。 参数包括：无显式参数。"""
         expected = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
         assert file_hash(b'abc') == 'file-v1:sha256:' + expected
         assert document_hash('abc') == 'document-v1:sha256:' + expected
@@ -110,9 +116,11 @@ class TestDocumentHashes:
 
     @pytest.mark.parametrize('left,right', [('可以','不可以'),('10 mg','100 mg'),('a b','ab'),('é','e\u0301'),('ABC','abc'),(' A','A'),('A.','A'),('\ufeffA','A')])
     def test_meaning_and_evidence_differences_preserved(self, left, right):
+        """验证 `meaning_and_evidence_differences_preserved` 所代表的行为。 参数包括：`left`、`right`。"""
         assert document_hash(left) != document_hash(right)
 
     def test_invalid_hash_inputs_fail(self):
+        """验证 `invalid_hash_inputs_fail` 所代表的行为。 参数包括：无显式参数。"""
         for call, value in ((file_hash,'abc'),(document_hash,b'abc'),(document_hash,'\ud800')):
             with pytest.raises(DocumentHashError):
                 call(value)
@@ -120,12 +128,14 @@ class TestDocumentHashes:
 
 class TestFormatParsers:
     def test_txt_preserves_bom_tabs_whitespace_and_newlines(self):
+        """验证 `txt_preserves_bom_tabs_whitespace_and_newlines` 所代表的行为。 参数包括：无显式参数。"""
         text = '\ufeff  第一行\r\n\t第二行\r第三行\n'
         result = parse_bytes(text.encode('utf-8'),'TXT')
         assert result.content == text
         assert result.blocks[0].start == 0
 
     def test_explicit_encoding_and_strict_decode(self):
+        """验证 `explicit_encoding_and_strict_decode` 所代表的行为。 参数包括：无显式参数。"""
         data = '中文'.encode('gb18030')
         assert parse_bytes(data,'TXT',options={'encoding':'gb18030'}).content == '中文'
         with pytest.raises(DocumentParseError):
@@ -134,12 +144,14 @@ class TestFormatParsers:
             parse_bytes(b'abc','TXT',options={'encoding':'unknown-encoding'})
 
     def test_pdf_real_text_and_page_metadata(self):
+        """验证 `pdf_real_text_and_page_metadata` 所代表的行为。 参数包括：无显式参数。"""
         result = parse_bytes(pdf_bytes(),'PDF')
         assert 'First page' in result.content and 'Second page' in result.content
         assert [block.location['page'] for block in result.blocks] == [1,2]
         assert ''.join(block.text for block in result.blocks) == result.content
 
     def test_pdf_empty_encrypted_and_image_only_paths(self):
+        """验证 `pdf_empty_encrypted_and_image_only_paths` 所代表的行为。 参数包括：无显式参数。"""
         assert parse_bytes(pdf_bytes(('',)),'PDF').content == ''
         with pytest.raises(DocumentParseError,match='加密'):
             parse_bytes(pdf_bytes(encrypted=True),'PDF')
@@ -147,6 +159,7 @@ class TestFormatParsers:
             parse_bytes(pdf_bytes(('',),image=True),'PDF')
 
     def test_docx_paragraphs_tables_and_nested_locations_in_order(self):
+        """验证 `docx_paragraphs_tables_and_nested_locations_in_order` 所代表的行为。 参数包括：无显式参数。"""
         result = parse_bytes(docx_bytes(),'DOCX')
         texts = ['第一段\t不可以\n10 mg','左单元格','右单元格','嵌套表格','结尾段落']
         assert [result.content.index(value) for value in texts] == sorted(result.content.index(value) for value in texts)
@@ -155,6 +168,7 @@ class TestFormatParsers:
             assert result.content[block.start:block.start+len(block.text)] == block.text
 
     def test_html_inline_context_entities_and_nontext_elements(self):
+        """验证 `html_inline_context_entities_and_nontext_elements` 所代表的行为。 参数包括：无显式参数。"""
         html = '<style>hidden-style</style><p>不<em>可以</em> &amp; 10 mg<br>条件保留</p><script>hidden-script</script><template>inert</template>'
         result = parse_bytes(html.encode(),'WEB')
         assert result.content == '不可以 & 10 mg\n条件保留\n'
@@ -162,10 +176,12 @@ class TestFormatParsers:
 
     @pytest.mark.parametrize('kind,data', [('PDF',b'broken'),('DOCX',b'broken'),('TXT',b'\xff'),('WEB',b'\xff')])
     def test_corrupt_documents_are_explicit_failures(self,kind,data):
+        """验证 `corrupt_documents_are_explicit_failures` 所代表的行为。 参数包括：`kind`、`data`。"""
         with pytest.raises(DocumentParseError):
             parse_bytes(data,kind)
 
     def test_unsupported_format_and_options_are_rejected(self):
+        """验证 `unsupported_format_and_options_are_rejected` 所代表的行为。 参数包括：无显式参数。"""
         for kind, options in [('DOC',{}),('PDF',{'password':'x'}),('TXT',{}),('TXT',{'encoding':'utf-8','extra':True})]:
             with pytest.raises(DocumentParseError):
                 parse_bytes(b'content',kind,options=options)
@@ -173,6 +189,7 @@ class TestFormatParsers:
 
 class TestFixedCountingAndSplitting:
     def test_fts_user_dictionary_cannot_change_fixed_counts(self,tmp_path):
+        """验证 `fts_user_dictionary_cannot_change_fixed_counts` 所代表的行为。 参数包括：`tmp_path`。"""
         path = tmp_path/'domain.txt'
         path.write_text('智识回溯协议 1000000 n\n',encoding='utf-8')
         fts = TextTokenizer(TokenizationConfig(user_dictionaries=[str(path)]))
@@ -180,6 +197,7 @@ class TestFixedCountingAndSplitting:
         assert get_counter().count('智识回溯协议') > 1
 
     def test_fixed_counter_and_manifest(self):
+        """验证 `fixed_counter_and_manifest` 所代表的行为。 参数包括：无显式参数。"""
         counter = get_counter()
         assert counter.count('Alpha Beta,\r\n123') == 4
         assert counter.count(' \n\t') == 0
@@ -189,6 +207,7 @@ class TestFixedCountingAndSplitting:
         assert counter.manifest['HMM'] is False
 
     def test_counter_rejects_different_runtime_or_resource(self, monkeypatch, tmp_path):
+        """验证 `counter_rejects_different_runtime_or_resource` 所代表的行为。 参数包括：`monkeypatch`、`tmp_path`。"""
         monkeypatch.setattr(counting.jieba,'__version__','different')
         with pytest.raises(TokenCountError):
             ChunkTokenCounter()
@@ -202,6 +221,7 @@ class TestFixedCountingAndSplitting:
 
     @pytest.mark.parametrize('size,overlap,separators', [(8,2,['']), (8,0,['\n',' ']), (3,2,['\n']), (8,3,['。',' ']), (7,1,[])])
     def test_original_coverage_offsets_max_size_and_progress(self,size,overlap,separators):
+        """验证 `original_coverage_offsets_max_size_and_progress` 所代表的行为。 参数包括：`size`、`overlap`、`separators`。"""
         text = 'Alpha\r\n中文。Beta Gamma\tDelta\r尾部 '
         document = parse_bytes(text.encode(),'TXT')
         config = ChunkConfig(chunk_size=size,chunk_overlap=overlap,separators=separators)
@@ -217,6 +237,7 @@ class TestFixedCountingAndSplitting:
         assert all(chunks[i+1].location_meta['text_start'] > chunks[i].location_meta['text_start'] for i in range(len(chunks)-1))
 
     def test_separator_priority_and_structural_page_boundaries(self):
+        """验证 `separator_priority_and_structural_page_boundaries` 所代表的行为。 参数包括：无显式参数。"""
         document = parse_bytes(b'AA BB\nCC DD EE','TXT')
         chunks = list(split_document(document,ChunkConfig(chunk_size=10,chunk_overlap=0,separators=['\n',' ']),get_counter()))
         assert chunks[0].content == 'AA BB\n'
@@ -227,6 +248,7 @@ class TestFixedCountingAndSplitting:
 
 class TestProcessingPipeline:
     def test_unicode_space_and_hash_in_archive_file_uri(self,connection,tmp_path):
+        """验证 `unicode_space_and_hash_in_archive_file_uri` 所代表的行为。 参数包括：`connection`、`tmp_path`。"""
         doc,path = registered(connection,tmp_path)
         special = tmp_path/'中文 # 归档.txt'
         special.write_bytes(path.read_bytes())
@@ -239,6 +261,7 @@ class TestProcessingPipeline:
 
     @pytest.mark.parametrize('kind', ['TXT','PDF','DOCX','WEB'])
     def test_four_formats_publish_valid_hash_counts_and_locations(self,connection,tmp_path,kind):
+        """验证 `four_formats_publish_valid_hash_counts_and_locations` 所代表的行为。 参数包括：`connection`、`tmp_path`、`kind`。"""
         data = {'TXT':b'Alpha\r\nBeta','PDF':pdf_bytes(),'DOCX':docx_bytes(),'WEB':b'<p>Alpha</p><p>Beta</p>'}[kind]
         doc,path = registered(connection,tmp_path,data,kind)
         service = DocumentProcessingService(connection)
@@ -260,11 +283,13 @@ class TestProcessingPipeline:
         assert connection.execute('SELECT count(*) FROM candidate').fetchone()[0] == 0
 
     def test_failure_resume_uses_snapshot_and_preserves_chunk_ids(self,connection,tmp_path,monkeypatch):
+        """验证 `failure_resume_uses_snapshot_and_preserves_chunk_ids` 所代表的行为。 参数包括：`connection`、`tmp_path`、`monkeypatch`。"""
         doc,_ = registered(connection,tmp_path,'Alpha 中文 Beta Gamma Delta Epsilon'.encode())
         service = DocumentProcessingService(connection)
         batch = service.create(doc,chunking=ChunkConfig(chunk_size=8,chunk_overlap=2,separators=['']))
         original = processing.split_document
         def fail_after_first(*args):
+            """执行 `fail_after_first` 对应的功能并返回处理结果。 参数包括：`*args`。"""
             for index,chunk in enumerate(original(*args)):
                 if index == 1:
                     raise RuntimeError('中途失败')
@@ -282,6 +307,7 @@ class TestProcessingPipeline:
         assert service.batches.get(batch.task_id).parse_config == batch.parse_config
 
     def test_reparse_preserves_old_batch_and_late_retry_cannot_rewind(self,connection,tmp_path,monkeypatch):
+        """验证 `reparse_preserves_old_batch_and_late_retry_cannot_rewind` 所代表的行为。 参数包括：`connection`、`tmp_path`、`monkeypatch`。"""
         doc,_ = registered(connection,tmp_path)
         service = DocumentProcessingService(connection)
         first = service.run(service.create(doc,chunking=ChunkConfig(chunk_size=9,chunk_overlap=1)).task_id)
@@ -299,6 +325,7 @@ class TestProcessingPipeline:
         assert connection.execute('SELECT chunk_batch FROM source_document').fetchone()[0] == 2
 
     def test_archive_changes_and_parser_versions_do_not_mix_with_old_batch(self,connection,tmp_path,monkeypatch):
+        """验证 `archive_changes_and_parser_versions_do_not_mix_with_old_batch` 所代表的行为。 参数包括：`connection`、`tmp_path`、`monkeypatch`。"""
         doc,path = registered(connection,tmp_path)
         service = DocumentProcessingService(connection)
         batch = service.create(doc)
@@ -313,6 +340,7 @@ class TestProcessingPipeline:
         assert connection.execute('SELECT count(*) FROM document_chunk').fetchone()[0] == 0
 
     def test_published_task_does_not_reparse(self,connection,tmp_path,monkeypatch):
+        """验证 `published_task_does_not_reparse` 所代表的行为。 参数包括：`connection`、`tmp_path`、`monkeypatch`。"""
         doc,_ = registered(connection,tmp_path)
         service = DocumentProcessingService(connection)
         published = service.run(service.create(doc).task_id)
@@ -321,6 +349,7 @@ class TestProcessingPipeline:
 
     @pytest.mark.parametrize('field',['token_counter','splitter_version'])
     def test_snapshot_version_mismatch_prevents_new_writes(self,connection,tmp_path,field):
+        """验证 `snapshot_version_mismatch_prevents_new_writes` 所代表的行为。 参数包括：`connection`、`tmp_path`、`field`。"""
         doc,_ = registered(connection,tmp_path)
         service = DocumentProcessingService(connection)
         batch = service.create(doc)
@@ -333,12 +362,14 @@ class TestProcessingPipeline:
         assert connection.execute('SELECT count(*) FROM document_chunk').fetchone()[0] == 0
 
     def test_empty_document_publishes_zero(self,connection,tmp_path):
+        """验证 `empty_document_publishes_zero` 所代表的行为。 参数包括：`connection`、`tmp_path`。"""
         doc,_ = registered(connection,tmp_path,b'')
         service = DocumentProcessingService(connection)
         result = service.run(service.create(doc).task_id)
         assert result.chunk_count == 0
 
     def test_outer_transaction_controls_all_stage_writes(self,connection,tmp_path):
+        """验证 `outer_transaction_controls_all_stage_writes` 所代表的行为。 参数包括：`connection`、`tmp_path`。"""
         doc,_ = registered(connection,tmp_path)
         connection.execute('BEGIN IMMEDIATE')
         service = DocumentProcessingService(connection)
@@ -350,6 +381,7 @@ class TestProcessingPipeline:
         assert connection.execute('SELECT chunk_batch FROM source_document').fetchone()[0] is None
 
     def test_missing_and_unarchived_sources_do_not_allocate_tasks(self,connection,tmp_path):
+        """验证 `missing_and_unarchived_sources_do_not_allocate_tasks` 所代表的行为。 参数包括：`connection`、`tmp_path`。"""
         doc,path = registered(connection,tmp_path)
         with connection:
             connection.execute("UPDATE source_document SET storage_url='https://example.test/source' WHERE id=?",(doc,))
@@ -363,11 +395,14 @@ class TestProcessingPipeline:
 
 class TestWebArchive:
     def test_http_archive_then_processing_works_after_server_stops(self,connection,tmp_path):
+        """验证 `http_archive_then_processing_works_after_server_stops` 所代表的行为。 参数包括：`connection`、`tmp_path`。"""
         data = '<p>归档后的中文正文</p>'.encode()
         class Handler(BaseHTTPRequestHandler):
             def log_message(self,*args):
+                """执行 `log_message` 对应的功能并返回处理结果。 参数包括：`*args`。"""
                 pass
             def do_GET(self):
+                """执行 `do_GET` 对应的功能并返回处理结果。 参数包括：无显式参数。"""
                 self.send_response(200)
                 self.send_header('Content-Type','text/html; charset=utf-8')
                 self.end_headers()
@@ -389,16 +424,19 @@ class TestWebArchive:
         assert archive.path.read_bytes() == data
 
     def test_response_bytes_archived_once_and_used_for_file_hash(self,tmp_path,monkeypatch):
+        """验证 `response_bytes_archived_once_and_used_for_file_hash` 所代表的行为。 参数包括：`tmp_path`、`monkeypatch`。"""
         data = '<p>中文</p>'.encode('gb18030')
         headers = Message()
         headers['Content-Type'] = 'text/html; charset=gb18030'
         class Response(io.BytesIO):
             def geturl(self):
+                """执行 `geturl` 对应的功能并返回处理结果。 参数包括：无显式参数。"""
                 return 'https://example.test/final'
         response = Response(data)
         response.headers = headers
         calls = []
         def fetch(request,**kwargs):
+            """执行 `fetch` 对应的功能并返回处理结果。 参数包括：`request`、`**kwargs`。"""
             calls.append((request.full_url,kwargs))
             return response
         monkeypatch.setattr(web,'urlopen',fetch)
@@ -412,6 +450,7 @@ class TestWebArchive:
         assert len(calls) == 1 and calls[0][1]['timeout'] == 7
 
     def test_invalid_scheme_and_failed_download_leave_no_archive(self,tmp_path,monkeypatch):
+        """验证 `invalid_scheme_and_failed_download_leave_no_archive` 所代表的行为。 参数包括：`tmp_path`、`monkeypatch`。"""
         path = tmp_path/'page.html'
         with pytest.raises(DocumentParseError):
             web.archive_web('file:///local',path)

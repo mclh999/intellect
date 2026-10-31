@@ -12,6 +12,7 @@ from intellect.doc.batches import DocumentBatchService
 
 @pytest.fixture
 def connection(tmp_path):
+    """执行 `connection` 对应的功能并返回处理结果。 参数包括：`tmp_path`。"""
     path = tmp_path / "tasks.db"
     initialize_database(path)
     with closing(connect_database(path)) as connection:
@@ -19,6 +20,7 @@ def connection(tmp_path):
 
 
 def import_task(connection):
+    """执行 `import_task` 对应的功能并返回处理结果。 参数包括：`connection`。"""
     with connection:
         document = connection.execute(
             "INSERT INTO source_document (title,storage_url,content_hash) VALUES ('资料','file:///source','test')"
@@ -27,6 +29,7 @@ def import_task(connection):
 
 
 def sync_task(connection, operation=0):
+    """执行 `sync_task` 对应的功能并返回处理结果。 参数包括：`connection`、`operation`。"""
     with connection:
         knowledge = connection.execute("INSERT INTO knowledge DEFAULT VALUES").lastrowid
         version = connection.execute(
@@ -42,6 +45,7 @@ def sync_task(connection, operation=0):
 
 class TestTaskQueries:
     def test_import_query_preserves_records_and_transaction_state(self, connection):
+        """验证 `import_query_preserves_records_and_transaction_state` 所代表的行为。 参数包括：`connection`。"""
         task_id = import_task(connection)
         before = connection.total_changes
         record = TaskQueryService(connection).get(task_id)
@@ -51,6 +55,7 @@ class TestTaskQueries:
 
     @pytest.mark.parametrize("operation", [0, 1])
     def test_sync_fields_and_historical_target_versions_are_supported(self, connection, operation):
+        """验证 `sync_fields_and_historical_target_versions_are_supported` 所代表的行为。 参数包括：`connection`、`operation`。"""
         task_id = sync_task(connection, operation)
         record = TaskQueryService(connection).get(task_id)
         with connection:
@@ -62,6 +67,7 @@ class TestTaskQueries:
         assert TaskQueryService(connection).get(task_id) == record
 
     def test_pending_queries_keep_types_separate_without_claiming(self, connection):
+        """验证 `pending_queries_keep_types_separate_without_claiming` 所代表的行为。 参数包括：`connection`。"""
         first, second = import_task(connection), import_task(connection)
         sync = sync_task(connection)
         with connection:
@@ -73,15 +79,18 @@ class TestTaskQueries:
 
     @pytest.mark.parametrize("task_id", [0, -1, True, "1", 999])
     def test_invalid_or_missing_task_id_rejected(self, connection, task_id):
+        """验证 `invalid_or_missing_task_id_rejected` 所代表的行为。 参数包括：`connection`、`task_id`。"""
         with pytest.raises(TaskExecutionError):
             TaskQueryService(connection).get(task_id)
 
     @pytest.mark.parametrize("kind", [-1, True, 2, "0"])
     def test_unknown_task_types_rejected(self, connection, kind):
+        """验证 `unknown_task_types_rejected` 所代表的行为。 参数包括：`connection`、`kind`。"""
         with pytest.raises(TaskExecutionError):
             TaskQueryService(connection).list_pending(kind)
 
     def test_query_does_not_commit_outer_transaction(self, connection):
+        """验证 `query_does_not_commit_outer_transaction` 所代表的行为。 参数包括：`connection`。"""
         task_id = import_task(connection)
         connection.execute("BEGIN IMMEDIATE")
         connection.execute("UPDATE task_process SET status=1 WHERE id=?", (task_id,))
@@ -91,11 +100,13 @@ class TestTaskQueries:
         assert TaskQueryService(connection).get(task_id).status == 0
 
     def test_queue_and_field_validation_share_read_snapshot(self, connection, monkeypatch):
+        """验证 `queue_and_field_validation_share_read_snapshot` 所代表的行为。 参数包括：`connection`、`monkeypatch`。"""
         task_id = import_task(connection)
         database_path = connection.execute("PRAGMA database_list").fetchone()[2]
         service = TaskQueryService(connection)
         get = service.get
         def change_then_get(task_id):
+            """执行 `change_then_get` 对应的功能并返回处理结果。 参数包括：`task_id`。"""
             with closing(connect_database(database_path)) as writer, writer:
                 writer.execute("UPDATE task_process SET status=1 WHERE id=?", (task_id,))
             return get(task_id)
@@ -112,6 +123,7 @@ class TestTaskFieldValidation:
         ("extract_config", "[]"), ("operation", 0),
     ])
     def test_invalid_import_field_combinations_rejected(self, connection, field, value):
+        """验证 `invalid_import_field_combinations_rejected` 所代表的行为。 参数包括：`connection`、`field`、`value`。"""
         task_id = import_task(connection)
         with connection:
             connection.execute(f"UPDATE task_process SET {field}=? WHERE id=?", (value, task_id))
@@ -124,6 +136,7 @@ class TestTaskFieldValidation:
         ("chunk_count", 0), ("extract_config", "{}"),
     ])
     def test_invalid_sync_field_combinations_rejected(self, connection, field, value):
+        """验证 `invalid_sync_field_combinations_rejected` 所代表的行为。 参数包括：`connection`、`field`、`value`。"""
         task_id = sync_task(connection)
         with connection:
             connection.execute(f"UPDATE task_process SET {field}=? WHERE id=?", (value, task_id))
@@ -131,6 +144,7 @@ class TestTaskFieldValidation:
             TaskQueryService(connection).get(task_id)
 
     def test_sync_version_owner_must_match_knowledge(self, connection):
+        """验证 `sync_version_owner_must_match_knowledge` 所代表的行为。 参数包括：`connection`。"""
         first, second = sync_task(connection), sync_task(connection)
         other = TaskQueryService(connection).get(second)
         with connection:

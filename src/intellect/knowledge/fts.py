@@ -48,6 +48,7 @@ def refresh_knowledge(
 
 
 def refresh_owner(connection: sqlite3.Connection, owner_type: int, owner_id: int) -> None:
+    """执行 `refresh_owner` 对应的功能并返回处理结果。 参数包括：`connection`、`owner_type`、`owner_id`。"""
     if owner_type == 0:
         refresh_knowledge(connection, owner_id)
     else:

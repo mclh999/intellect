@@ -20,11 +20,13 @@ class DocumentBatchError(IntellectError):
 
 
 def _integer(value: int, name: str, minimum: int = 0) -> None:
+    """执行 `integer` 所属的内部处理步骤。 参数包括：`value`、`name`、`minimum`。"""
     if type(value) is not int or value < minimum:
         raise DocumentBatchError(f"{name} 必须为不小于 {minimum} 的整数")
 
 
 def _json(value: dict) -> str:
+    """执行 `json` 所属的内部处理步骤。 参数包括：`value`。"""
     if not isinstance(value, dict):
         raise DocumentBatchError("配置或位置元数据必须为 JSON 对象")
     try:
@@ -35,6 +37,7 @@ def _json(value: dict) -> str:
 
 @contextmanager
 def _atomic(connection: sqlite3.Connection):
+    """执行 `atomic` 所属的内部处理步骤。 参数包括：`connection`。"""
     nested = connection.in_transaction
     savepoint = "document_batch_" + uuid4().hex
     connection.execute(f"SAVEPOINT {savepoint}" if nested else "BEGIN IMMEDIATE")
@@ -78,6 +81,7 @@ class DocumentBatchService:
     """
 
     def __init__(self, connection: sqlite3.Connection, *, lease: TaskLease | None = None):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：`connection`、`lease`。"""
         self.connection = connection
         self.lease = lease
         columns = {row[1] for row in connection.execute("PRAGMA table_info(task_process)")}
@@ -85,6 +89,7 @@ class DocumentBatchService:
             raise DocumentBatchError("批次服务需要 V0.7 结构；已有事实库须先评审迁移")
 
     def get(self, task_id: int) -> ImportBatch:
+        """执行 `get` 对应的功能并返回处理结果。 参数包括：`task_id`。"""
         _integer(task_id, "task_id", 1)
         row = self.connection.execute(
             "SELECT id, source_document_id, chunk_batch, parse_config, chunk_count "
@@ -95,6 +100,7 @@ class DocumentBatchService:
         return ImportBatch(*row)
 
     def _document(self, document_id: int):
+        """执行 `document` 所属的内部处理步骤。 参数包括：`document_id`。"""
         row = self.connection.execute(
             "SELECT chunk_batch, status FROM source_document WHERE id = ?", (document_id,),
         ).fetchone()
@@ -106,6 +112,7 @@ class DocumentBatchService:
         self, source_document_id: int, *, parser: str, parser_version: str,
         chunking: ChunkConfig | None = None, parser_options: dict | None = None,
     ) -> ImportBatch:
+        """执行 `create` 对应的功能并返回处理结果。 参数包括：`source_document_id`、`parser`、`parser_version`、`chunking`、`parser_options`。"""
         if self.lease is not None:
             raise DocumentBatchError("worker 必须恢复已绑定任务，不能分配新批次")
         _integer(source_document_id, "source_document_id", 1)
@@ -143,6 +150,7 @@ class DocumentBatchService:
             return self.get(task_id)
 
     def save_chunks(self, task_id: int, chunks: Iterable[ChunkInput]) -> list[int]:
+        """执行 `save_chunks` 对应的功能并返回处理结果。 参数包括：`task_id`、`chunks`。"""
         ids = []
         with _atomic(self.connection):
             if self.lease is not None:

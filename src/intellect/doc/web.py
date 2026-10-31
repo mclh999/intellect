@@ -21,6 +21,7 @@ class WebArchive:
 
 
 def archive_web(url: str, destination: str | Path) -> WebArchive:
+    """执行 `archive_web` 对应的功能并返回处理结果。 参数包括：`url`、`destination`。"""
     if urlparse(url).scheme.lower() not in {"http", "https"}:
         raise DocumentParseError("WEB 归档只支持 HTTP/HTTPS")
     path = Path(destination).resolve()

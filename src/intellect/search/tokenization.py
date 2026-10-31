@@ -32,21 +32,25 @@ class TokenizationManifest:
 
     @property
     def asset_id(self) -> str:
+        """执行 `asset_id` 对应的功能并返回处理结果。 参数包括：无显式参数。"""
         data = json.dumps(asdict(self), sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(data.encode("utf-8")).hexdigest()
 
 
 class _SnapshotTokenizer(jieba.Tokenizer):
     def __init__(self, dictionary: bytes):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：`dictionary`。"""
         super().__init__()
         self._dictionary_snapshot = dictionary
         self.cache_file = "intellect-jieba-" + hashlib.sha256(dictionary).hexdigest() + ".cache"
 
     def get_dict_file(self):
+        """执行 `get_dict_file` 对应的功能并返回处理结果。 参数包括：无显式参数。"""
         return io.BytesIO(self._dictionary_snapshot)
 
 
 def _read_asset(path: str) -> bytes:
+    """执行 `read_asset` 所属的内部处理步骤。 参数包括：`path`。"""
     try:
         return Path(path).read_bytes()
     except OSError as exc:
@@ -57,6 +61,7 @@ class TextTokenizer:
     """构造后保持词典与停用词快照；外部文件变动不会悄悄改变在用实例。"""
 
     def __init__(self, config: TokenizationConfig | None = None):
+        """实现 `__init__` 生命周期钩子，初始化或维护对象状态。 参数包括：`config`。"""
         config = config if config is not None else get_settings().tokenization
         with jieba.Tokenizer().get_dict_file() as dictionary_file:
             dictionary = dictionary_file.read()
@@ -94,20 +99,25 @@ class TextTokenizer:
 
     @property
     def manifest(self) -> TokenizationManifest:
+        """执行 `manifest` 对应的功能并返回处理结果。 参数包括：无显式参数。"""
         return self._manifest
 
     def tokenize(self, text: str) -> list[str]:
+        """执行 `tokenize` 对应的功能并返回处理结果。 参数包括：`text`。"""
         return [word for word in self._engine.cut(text) if word.strip()]
 
     def query_terms(self, text: str) -> list[str]:
+        """执行 `query_terms` 对应的功能并返回处理结果。 参数包括：`text`。"""
         return [word for word in self.tokenize(text) if word not in self._stopwords]
 
     def token_text(self, texts: Iterable[str]) -> str:
+        """执行 `token_text` 对应的功能并返回处理结果。 参数包括：`texts`。"""
         return " ".join(word for text in texts for word in self.tokenize(text))
 
 
 @lru_cache(maxsize=1)
 def get_tokenizer() -> TextTokenizer:
+    """执行 `get_tokenizer` 对应的功能并返回处理结果。 参数包括：无显式参数。"""
     return TextTokenizer()
 
 
@@ -117,8 +127,10 @@ def reset_tokenizer_cache() -> None:
 
 
 def tokenize(text: str) -> list[str]:
+    """执行 `tokenize` 对应的功能并返回处理结果。 参数包括：`text`。"""
     return get_tokenizer().tokenize(text)
 
 
 def token_text(texts: Iterable[str]) -> str:
+    """执行 `token_text` 对应的功能并返回处理结果。 参数包括：`texts`。"""
     return get_tokenizer().token_text(texts)

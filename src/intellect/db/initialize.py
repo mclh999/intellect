@@ -1,4 +1,4 @@
-"""新库初始化：V0.9 DDL 原子执行，不承担既有事实库迁移（T1.1）。"""
+"""新库初始化：V0.11 DDL 原子执行，不承担既有事实库迁移（T1.1）。"""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ class DatabaseInitializationError(IntellectError):
 
 
 def _require_empty_database(connection: sqlite3.Connection) -> None:
+    """执行 `require_empty_database` 所属的内部处理步骤。 参数包括：`connection`。"""
     existing = connection.execute(
         "SELECT name FROM sqlite_master WHERE name NOT GLOB 'sqlite_*' LIMIT 1"
     ).fetchone()
@@ -29,6 +30,7 @@ def _require_empty_database(connection: sqlite3.Connection) -> None:
 
 def _execute_schema(connection: sqlite3.Connection, schema: str) -> None:
     # executescript 会先提交在途事务；逐条执行 DDL，保证中途失败全部回滚。
+    """执行 `execute_schema` 所属的内部处理步骤。 参数包括：`connection`、`schema`。"""
     statement = ""
     for line in schema.splitlines(keepends=True):
         statement += line
@@ -40,10 +42,10 @@ def _execute_schema(connection: sqlite3.Connection, schema: str) -> None:
 
 
 def initialize_database(path: str | Path | None = None) -> None:
-    """在空库创建 16 张业务表及 FTS5，已有结构时报错并保留原数据。
+    """在空库创建 17 张业务表及 FTS5，已有结构时报错并保留原数据。
 
-    WAL 在 DDL 事务之前设置；表与索引在一个 BEGIN IMMEDIATE 事务中建立。
-    失败仅回滚结构，不删除数据库文件；空库修正问题后可重试初始化。
+    WAL 在 DDL 事务之前设置；表、索引与测试管理员在一个 BEGIN IMMEDIATE 事务中建立。
+    失败回滚结构和初始化数据，不删除数据库文件；空库修正问题后可重试初始化。
     """
     target = _database_path(path)
     schema = files("intellect.db").joinpath("schema.sql").read_text(encoding="utf-8")
@@ -63,4 +65,4 @@ def initialize_database(path: str | Path | None = None) -> None:
         ) from exc
     finally:
         connection.close()
-    logger.info("数据库 V0.9 初始化完成：%s", target)
+    logger.info("数据库 V0.11 初始化完成：%s", target)
